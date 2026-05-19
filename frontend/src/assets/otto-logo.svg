@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80">
+  <!-- Square Outer Border -->
+  <rect x="4" y="4" width="92" height="92" rx="6" fill="#ffffff" stroke="#7B1F1F" stroke-width="8"/>
+  <!-- Circular Inner Banner -->
+  <circle cx="50" cy="50" r="30" fill="#C9252C"/>
+  <!-- Brand Name Text -->
+  <text x="50" y="48" font-family="'Outfit', 'Inter', 'Segoe UI', sans-serif" font-weight="900" font-size="16" fill="#ffffff" text-anchor="middle" letter-spacing="-0.5">otto</text>
+  <text x="50" y="63" font-family="'Outfit', 'Inter', 'Segoe UI', sans-serif" font-weight="700" font-size="9" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">SHOES</text>
+</svg>
