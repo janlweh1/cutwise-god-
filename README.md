@@ -2,7 +2,7 @@
   <h1 align="center">💎 CutWise IMS</h1>
   <p align="center">
     <strong>Intelligent Inventory Management System</strong><br/>
-    Built with React · Django · Supabase
+    Built with React · Django · Supabases
   </p>
 </p>
 
