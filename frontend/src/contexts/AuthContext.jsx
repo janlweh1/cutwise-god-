@@ -158,40 +158,52 @@ export const AuthProvider = ({ children }) => {
   // Initialize and track auth states
   useEffect(() => {
     const initAuth = async () => {
-      const { data: { session: activeSession } } = await supabase.auth.getSession();
-      
-      if (activeSession) {
-        setSession(activeSession);
-        setUser(activeSession.user);
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
         
-        const profile = await fetchUserProfile(activeSession.user.id);
-        if (profile) {
-          setRole(profile.role);
-          setFullName(profile.full_name);
+        if (activeSession) {
+          setSession(activeSession);
+          setUser(activeSession.user);
+          
+          const profile = await fetchUserProfile(activeSession.user.id);
+          if (profile) {
+            setRole(profile.role);
+            setFullName(profile.full_name);
+          }
         }
+      } catch (err) {
+        console.error("Error in initAuth:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user || null);
+        try {
+          if (newSession) {
+            setLoading(true);
+            setSession(newSession);
+            setUser(newSession.user);
 
-        if (newSession) {
-          const profile = await fetchUserProfile(newSession.user.id);
-          if (profile) {
-            setRole(profile.role);
-            setFullName(profile.full_name);
+            const profile = await fetchUserProfile(newSession.user.id);
+            if (profile) {
+              setRole(profile.role);
+              setFullName(profile.full_name);
+            }
+          } else {
+            setSession(null);
+            setUser(null);
+            setRole(null);
+            setFullName(null);
           }
-        } else {
-          setRole(null);
-          setFullName(null);
+        } catch (err) {
+          console.error("Error in onAuthStateChange:", err);
+        } finally {
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 

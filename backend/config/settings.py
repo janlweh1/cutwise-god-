@@ -79,17 +79,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# ──────────────────────────────────────────────
-# Database — Supabase PostgreSQL
-# ──────────────────────────────────────────────
+import sys
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=env("DATABASE_URL", default="sqlite:///db.sqlite3"),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
+if "test" in sys.argv or "pytest" in sys.modules:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=env("DATABASE_URL", default="sqlite:///db.sqlite3"),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
 
 # ──────────────────────────────────────────────
 # Supabase Client Configuration
