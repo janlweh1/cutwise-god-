@@ -11,6 +11,9 @@ from django.contrib.auth.models import User
 from utils.supabase_client import get_supabase_client
 
 
+import time
+from threading import Lock
+
 class SupabaseJWTAuthentication(BaseAuthentication):
     """
     Authenticate incoming requests by verifying the Bearer token
@@ -19,6 +22,12 @@ class SupabaseJWTAuthentication(BaseAuthentication):
     On success, it returns (django_user, token_data) where django_user
     is a local User object synced from the Supabase user record.
     """
+
+    # Class-level cache to store validated user details
+    # Structure: token -> { "user_id": int, "email": str, "full_name": str, "role": str, "expires_at": float }
+    _cache = {}
+    _cache_lock = Lock()
+    CACHE_TTL = 120  # Cache validation results for 2 minutes (120 seconds)
 
     def authenticate(self, request):
         auth_header = request.headers.get("Authorization")
@@ -29,7 +38,30 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         if not token:
             return None
 
-        # Validate the token against Supabase Auth
+        # Check in-memory cache first
+        now = time.time()
+        cached_val = None
+        with self._cache_lock:
+            # Periodically clean up expired entries to avoid memory leak
+            self._cache = {k: v for k, v in self._cache.items() if v["expires_at"] > now}
+            cached_val = self._cache.get(token)
+
+        if cached_val and cached_val["expires_at"] > now:
+            user_id = cached_val["user_id"]
+            email = cached_val["email"]
+            full_name = cached_val["full_name"]
+            role = cached_val["role"]
+
+            try:
+                django_user = User.objects.get(id=user_id)
+                # Re-attach extra metadata
+                django_user.supabase_role = role
+                django_user.supabase_full_name = full_name
+                return (django_user, {"token": token, "role": role, "supabase_uid": django_user.username})
+            except User.DoesNotExist:
+                pass  # If user was deleted locally, fall through to re-authenticate and re-create
+
+        # Validate the token against Supabase Auth (network request)
         try:
             supabase = get_supabase_client()
             user_response = supabase.auth.get_user(token)
@@ -72,7 +104,18 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         django_user.supabase_role = role
         django_user.supabase_full_name = full_name
 
+        # Cache the validation result
+        with self._cache_lock:
+            self._cache[token] = {
+                "user_id": django_user.id,
+                "email": email,
+                "full_name": full_name,
+                "role": role,
+                "expires_at": time.time() + self.CACHE_TTL
+            }
+
         return (django_user, {"token": token, "role": role, "supabase_uid": supabase_uid})
 
     def authenticate_header(self, request):
         return "Bearer"
+
