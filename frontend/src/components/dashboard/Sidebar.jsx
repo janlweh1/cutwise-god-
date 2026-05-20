@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import logoImg from "../../assets/otto-logo.svg";
@@ -7,6 +6,7 @@ const navItems = [
   {
     id: "home",
     label: "Home",
+    roles: ["employee", "supervisor", "admin"],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -17,6 +17,7 @@ const navItems = [
   {
     id: "inventory",
     label: "Inventory Management",
+    roles: ["employee", "supervisor", "admin"],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
@@ -27,6 +28,7 @@ const navItems = [
   {
     id: "scrap",
     label: "Scrap Management",
+    roles: ["employee", "supervisor", "admin"],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -39,6 +41,7 @@ const navItems = [
   {
     id: "supplier",
     label: "Supplier Reference",
+    roles: ["employee", "supervisor", "admin"],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -50,7 +53,8 @@ const navItems = [
   },
   {
     id: "reports",
-    label: "Reports",
+    label: "Audit Trail",
+    roles: ["supervisor", "admin"],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="20" x2="18" y2="10" />
@@ -62,6 +66,7 @@ const navItems = [
   {
     id: "settings",
     label: "Settings",
+    roles: ["admin"],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3" />
@@ -72,13 +77,18 @@ const navItems = [
 ];
 
 const Sidebar = ({ collapsed, onToggle, activeItem, onNavClick, userName, userRole }) => {
-  const { signOut } = useAuth();
+  const { signOut, role } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
+
+  // Filter nav items to only those accessible by the current user's role
+  const visibleItems = navItems.filter(
+    (item) => item.roles.includes(role)
+  );
 
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -99,7 +109,7 @@ const Sidebar = ({ collapsed, onToggle, activeItem, onNavClick, userName, userRo
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <button
             key={item.id}
             className={`sidebar-link ${activeItem === item.id ? "active" : ""}`}
