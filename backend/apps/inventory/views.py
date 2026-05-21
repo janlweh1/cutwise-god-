@@ -86,6 +86,20 @@ class SupplierViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ["name", "created_at"]
 
+    def create(self, request, *args, **kwargs):
+        import traceback
+        print(f"\n[DEBUG] SupplierViewSet.create called")
+        print(f"[DEBUG] request.data = {request.data}")
+        print(f"[DEBUG] request.user = {request.user}, authenticated = {request.user.is_authenticated}")
+        try:
+            response = super().create(request, *args, **kwargs)
+            print(f"[DEBUG] create succeeded, status = {response.status_code}")
+            return response
+        except Exception as e:
+            print(f"[DEBUG] create FAILED: {e}")
+            traceback.print_exc()
+            raise
+
     def perform_create(self, serializer):
         instance = serializer.save()
         log_action(

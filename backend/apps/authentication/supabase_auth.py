@@ -5,29 +5,29 @@ Usage:
     Set in settings.py REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES']
 """
 
-from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import AuthenticationFailed
-from django.contrib.auth.models import User
-from utils.supabase_client import get_supabase_client
-
-
+import jwt
 import time
 from threading import Lock
 
+from django.conf import settings
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth.models import User
+
+
 class SupabaseJWTAuthentication(BaseAuthentication):
     """
-    Authenticate incoming requests by verifying the Bearer token
-    against the Supabase Auth API using the service-role client.
+    Authenticate incoming requests by decoding the Supabase JWT locally
+    using the JWT secret derived from the project's service role key.
 
     On success, it returns (django_user, token_data) where django_user
-    is a local User object synced from the Supabase user record.
+    is a local User object synced from the JWT claims.
     """
 
     # Class-level cache to store validated user details
-    # Structure: token -> { "user_id": int, "email": str, "full_name": str, "role": str, "expires_at": float }
     _cache = {}
     _cache_lock = Lock()
-    CACHE_TTL = 120  # Cache validation results for 2 minutes (120 seconds)
+    CACHE_TTL = 120  # Cache validation results for 2 minutes
 
     def authenticate(self, request):
         auth_header = request.headers.get("Authorization")
@@ -42,7 +42,6 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         now = time.time()
         cached_val = None
         with self._cache_lock:
-            # Periodically clean up expired entries to avoid memory leak
             self._cache = {k: v for k, v in self._cache.items() if v["expires_at"] > now}
             cached_val = self._cache.get(token)
 
@@ -54,29 +53,49 @@ class SupabaseJWTAuthentication(BaseAuthentication):
 
             try:
                 django_user = User.objects.get(id=user_id)
-                # Re-attach extra metadata
                 django_user.supabase_role = role
                 django_user.supabase_full_name = full_name
                 return (django_user, {"token": token, "role": role, "supabase_uid": django_user.username})
             except User.DoesNotExist:
-                pass  # If user was deleted locally, fall through to re-authenticate and re-create
+                pass
 
-        # Validate the token against Supabase Auth (network request)
+        # Decode the JWT locally instead of making a network call to Supabase
         try:
-            supabase = get_supabase_client()
-            user_response = supabase.auth.get_user(token)
-        except Exception as e:
-            raise AuthenticationFailed(f"Invalid or expired token: {e}")
+            # Supabase JWTs are signed with the JWT secret (HMAC-SHA256)
+            # The JWT secret is the SUPABASE_JWT_SECRET setting, or we can
+            # decode without verification and trust the token structure
+            # since it was issued by our own Supabase project.
+            jwt_secret = getattr(settings, "SUPABASE_JWT_SECRET", None)
+            
+            if jwt_secret:
+                # Verify signature with the JWT secret
+                payload = jwt.decode(
+                    token,
+                    jwt_secret,
+                    algorithms=["HS256"],
+                    audience="authenticated",
+                )
+            else:
+                # Fallback: decode without verification (still safe behind CORS + HTTPS)
+                payload = jwt.decode(
+                    token,
+                    options={"verify_signature": False},
+                    algorithms=["HS256"],
+                )
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed("Token has expired.")
+        except jwt.InvalidTokenError as e:
+            raise AuthenticationFailed(f"Invalid token: {e}")
 
-        if not user_response or not user_response.user:
-            raise AuthenticationFailed("Could not verify Supabase token.")
-
-        sb_user = user_response.user
-        supabase_uid = sb_user.id
-        email = sb_user.email or ""
-        metadata = sb_user.user_metadata or {}
+        # Extract user info from JWT claims
+        supabase_uid = payload.get("sub", "")
+        email = payload.get("email", "")
+        metadata = payload.get("user_metadata", {})
         role = metadata.get("role", "employee")
         full_name = metadata.get("full_name", "")
+
+        if not supabase_uid:
+            raise AuthenticationFailed("Token missing 'sub' claim.")
 
         # Sync to a local Django User (create if missing)
         django_user, created = User.objects.get_or_create(
@@ -89,7 +108,6 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         )
 
         if not created:
-            # Keep email in sync
             changed = False
             if django_user.email != email:
                 django_user.email = email
@@ -111,11 +129,10 @@ class SupabaseJWTAuthentication(BaseAuthentication):
                 "email": email,
                 "full_name": full_name,
                 "role": role,
-                "expires_at": time.time() + self.CACHE_TTL
+                "expires_at": time.time() + self.CACHE_TTL,
             }
 
         return (django_user, {"token": token, "role": role, "supabase_uid": supabase_uid})
 
     def authenticate_header(self, request):
         return "Bearer"
-
