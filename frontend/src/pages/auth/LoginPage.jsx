@@ -64,7 +64,7 @@ export const LoginPage = () => {
       logRemote(`LoginPage: response status=${response.status}`, "info");
       const text = await response.text();
       logRemote(`LoginPage: response body=${text}`, "info");
-      
+
       const parsed = JSON.parse(text);
       const profile = parsed && parsed.length > 0 ? parsed[0] : null;
 
@@ -124,7 +124,7 @@ export const LoginPage = () => {
         } else {
           setDebugLogs([]);
         }
-      } catch (e) {}
+      } catch (e) { }
     };
 
     updateLogs();
@@ -285,8 +285,8 @@ export const LoginPage = () => {
               alignItems: 'center'
             }}>
               <span>⚙️ LIVE AUTH PROCESS TRACE:</span>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => { localStorage.removeItem("debug_logs"); setDebugLogs([]); }}
                 style={{
                   background: 'transparent',
