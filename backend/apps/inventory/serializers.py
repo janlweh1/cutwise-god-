@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
+from .models import Supplier, Material, Scrap, ScrapSale, AuditLog, Delivery
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -88,6 +88,37 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
             return obj.sold_by.profile.full_name or obj.sold_by.email
         except Exception:
             return obj.sold_by.email
+
+
+class DeliverySerializer(serializers.ModelSerializer):
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    received_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Delivery
+        fields = [
+            "id",
+            "batch_number",
+            "material_name",
+            "quantity",
+            "size",
+            "supplier",
+            "supplier_name",
+            "status",
+            "created_at",
+            "received_at",
+            "received_by",
+            "received_by_name",
+        ]
+        read_only_fields = ["id", "created_at", "received_at", "received_by"]
+
+    def get_received_by_name(self, obj):
+        if not obj.received_by:
+            return ""
+        try:
+            return obj.received_by.profile.full_name or obj.received_by.email
+        except Exception:
+            return obj.received_by.email
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
