@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient";
+import api from "../../lib/api";
 import HeroPanel from "../../components/auth/HeroPanel";
 import logoImg from "../../assets/otto-logo.svg";
 import "../../styles/auth.css";
@@ -23,15 +23,10 @@ export const ForgotPasswordPage = () => {
     setSubmitting(true);
 
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (resetError) throw resetError;
-
+      await api.post("/auth/forgot-password/", { email });
       setMessage("Password reset link has been sent to your email address.");
     } catch (err) {
-      setError(err.message || "Failed to send reset link. Please try again.");
+      setError(err.response?.data?.detail || "Failed to send reset link. Please try again.");
     } finally {
       setSubmitting(false);
     }

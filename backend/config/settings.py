@@ -1,7 +1,7 @@
 """
 Django settings for CutWise IMS project.
 
-Configured for Supabase (PostgreSQL) as the primary database.
+Configured for local PostgreSQL as the primary database.
 """
 
 import os
@@ -97,13 +97,6 @@ else:
         )
     }
 
-# ──────────────────────────────────────────────
-# Supabase Client Configuration
-# ──────────────────────────────────────────────
-
-SUPABASE_URL = env("SUPABASE_URL", default="")
-SUPABASE_ANON_KEY = env("SUPABASE_ANON_KEY", default="")
-SUPABASE_SERVICE_ROLE_KEY = env("SUPABASE_SERVICE_ROLE_KEY", default="")
 
 # ──────────────────────────────────────────────
 # Password Validation
@@ -145,7 +138,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "apps.authentication.supabase_auth.SupabaseJWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -162,7 +155,8 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
+    "BLACKLIST_AFTER_ROTATION": False,
+    "TOKEN_OBTAIN_SERIALIZER": "apps.authentication.jwt_serializers.CustomTokenObtainPairSerializer",
 }
 
 # ──────────────────────────────────────────────

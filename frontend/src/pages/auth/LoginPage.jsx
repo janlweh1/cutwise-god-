@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import HeroPanel from "../../components/auth/HeroPanel";
 import logoImg from "../../assets/otto-logo.svg";
-import { supabase } from "../../lib/supabaseClient";
 import { logRemote } from "../../lib/logger";
 import "../../styles/auth.css";
 
@@ -13,7 +12,7 @@ export const LoginPage = () => {
   const { signIn, signOut } = useAuth();
 
   const roleParam = searchParams.get("role")?.toLowerCase();
-  const validRoles = ["employee", "admin", "supervisor"];
+  const validRoles = ["inventory_clerk", "admin", "supervisor"];
 
   // Redirect if role is invalid
   useEffect(() => {
@@ -47,52 +46,28 @@ export const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      // 1. Sign in user
+      // 1. Sign in — role and full_name come back in the JWT response
       logRemote("LoginPage: calling signIn...", "info");
       const data = await signIn(email, password);
-      logRemote(`LoginPage: signIn resolved. user_id=${data?.user?.id}`, "info");
+      logRemote(`LoginPage: signIn resolved. role=${data?.role}`, "info");
 
-      // 2. Fetch profile from public.profiles to verify role
-      logRemote("LoginPage: fetching profile...", "info");
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${data.user.id}&select=role`;
-      const response = await fetch(url, {
-        headers: {
-          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        }
-      });
-      logRemote(`LoginPage: response status=${response.status}`, "info");
-      const text = await response.text();
-      logRemote(`LoginPage: response body=${text}`, "info");
-
-      const parsed = JSON.parse(text);
-      const profile = parsed && parsed.length > 0 ? parsed[0] : null;
-
-      if (!profile) {
-        logRemote("LoginPage: profile empty or error, signing out...", "warn");
-        await signOut();
-        setError("Error verifying user profile. Please try again.");
-        setSubmitting(false);
-        return;
-      }
-
-      // 3. Verify user's actual role matches the selected login role
-      if (profile.role !== roleParam) {
-        logRemote(`LoginPage: role mismatch: profile.role=${profile.role} vs roleParam=${roleParam}, signing out...`, "warn");
+      // 2. Verify the user's actual role matches the selected login role
+      if (data.role !== roleParam) {
+        logRemote(`LoginPage: role mismatch: data.role=${data.role} vs roleParam=${roleParam}, signing out...`, "warn");
         await signOut();
         setError(`Access Denied: Your account does not have the "${capitalize(roleParam)}" role.`);
         setSubmitting(false);
         return;
       }
 
-      // 4. Handle remember me
+      // 3. Handle remember me
       if (rememberMe) {
         localStorage.setItem("remember_email", email);
       } else {
         localStorage.removeItem("remember_email");
       }
 
-      // 5. Redirect based on role
+      // 4. Redirect based on role
       logRemote(`LoginPage: redirecting to /dashboard/${roleParam}`, "info");
       navigate(`/dashboard/${roleParam}`, { replace: true });
     } catch (err) {

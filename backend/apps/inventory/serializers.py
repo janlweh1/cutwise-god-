@@ -1,178 +1,97 @@
 from rest_framework import serializers
-from .models import (
-    Category,
-    Product,
-    StockMovement,
-    Supplier,
-    Material,
-    ScrapInventory,
-    AuditLog,
-)
+from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 
-
-# ──────────────────────────────────────────────
-# Legacy serializers (kept for backward-compat)
-# ──────────────────────────────────────────────
-
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = "__all__"
-
-
-class ProductSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    is_low_stock = serializers.BooleanField(read_only=True)
-
-    class Meta:
-        model = Product
-        fields = "__all__"
-
-
-class StockMovementSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.name", read_only=True)
-
-    class Meta:
-        model = StockMovement
-        fields = "__all__"
-
-
-# ──────────────────────────────────────────────
-# Sprint 1 — New serializers
-# ──────────────────────────────────────────────
 
 class SupplierSerializer(serializers.ModelSerializer):
-    material_count = serializers.SerializerMethodField()
-
     class Meta:
         model = Supplier
-        fields = [
-            "id",
-            "name",
-            "contact_person",
-            "phone",
-            "email",
-            "address",
-            "is_active",
-            "material_count",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-    def get_material_count(self, obj):
-        return obj.materials.count()
+        fields = ["id", "name", "contact_person", "phone", "email"]
 
 
 class MaterialSerializer(serializers.ModelSerializer):
+    stock_status = serializers.ReadOnlyField()
+    total_value = serializers.ReadOnlyField()
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
-    stock_status = serializers.CharField(read_only=True)
-    total_value = serializers.DecimalField(
-        max_digits=14, decimal_places=2, read_only=True
-    )
+    added_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Material
         fields = [
             "id",
-            "name",
+            "supplier",
+            "supplier_name",
+            "added_by",
+            "added_by_name",
+            "material_name",
             "material_type",
             "size",
             "quantity",
             "unit_cost",
-            "supplier",
-            "supplier_name",
-            "reorder_level",
-            "is_active",
+            "min_stock",
+            "last_update",
             "stock_status",
             "total_value",
-            "created_at",
-            "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "last_update", "added_by"]
 
-    def validate(self, data):
-        """Reject duplicate material records (same name + type + supplier)."""
-        name = data.get("name", getattr(self.instance, "name", None))
-        material_type = data.get(
-            "material_type", getattr(self.instance, "material_type", None)
-        )
-        supplier = data.get("supplier", getattr(self.instance, "supplier", None))
-
-        qs = Material.objects.filter(
-            name__iexact=name,
-            material_type=material_type,
-            supplier=supplier,
-        )
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(
-                "A material with this name, type, and supplier already exists."
-            )
-        return data
+    def get_added_by_name(self, obj):
+        if not obj.added_by:
+            return ""
+        try:
+            return obj.added_by.profile.full_name or obj.added_by.email
+        except Exception:
+            return obj.added_by.email
 
 
-class ScrapInventorySerializer(serializers.ModelSerializer):
-    material_type_display = serializers.CharField(
-        source="get_material_type_display", read_only=True
-    )
-    source_display = serializers.CharField(
-        source="get_source_display", read_only=True
-    )
+class ScrapSerializer(serializers.ModelSerializer):
+    material_name = serializers.CharField(source="material.material_name", read_only=True)
 
     class Meta:
-        model = ScrapInventory
+        model = Scrap
         fields = [
             "id",
-            "source_batch",
-            "material_type",
-            "material_type_display",
+            "material",
+            "material_name",
             "weight_kg",
-            "value",
-            "source",
-            "source_display",
-            "notes",
-            "created_at",
-            "updated_at",
+            "recorded_date",
+            "status",
         ]
-        read_only_fields = ["id", "value", "created_at", "updated_at"]
+        read_only_fields = ["id", "recorded_date"]
 
-    # Default scrap pricing per kg (₱ per kg) by material type
-    SCRAP_RATES = {
-        "cowhide": 50,
-        "goatskin": 45,
-        "sheepskin": 40,
-        "suede": 35,
-        "nappa": 55,
-        "synthetic": 20,
-        "rubber": 15,
-        "other": 25,
-    }
 
-    def create(self, validated_data):
-        """Auto-compute scrap value based on weight and material type."""
-        material_type = validated_data.get("material_type", "other")
-        weight = validated_data.get("weight_kg", 0)
-        rate = self.SCRAP_RATES.get(material_type, 25)
-        validated_data["value"] = round(float(weight) * rate, 2)
-        return super().create(validated_data)
+class ScrapSaleSerializer(serializers.ModelSerializer):
+    scrap_material = serializers.CharField(
+        source="scrap.material.material_name", read_only=True
+    )
+    sold_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ScrapSale
+        fields = [
+            "id",
+            "scrap",
+            "scrap_material",
+            "sold_by",
+            "sold_by_name",
+            "quantity_sold",
+            "sale_price_per_kg",
+            "total_amount",
+            "sale_date",
+            "profit",
+        ]
+        read_only_fields = ["id", "sale_date", "sold_by"]
+
+    def get_sold_by_name(self, obj):
+        if not obj.sold_by:
+            return ""
+        try:
+            return obj.sold_by.profile.full_name or obj.sold_by.email
+        except Exception:
+            return obj.sold_by.email
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
-    action_display = serializers.CharField(
-        source="get_action_display", read_only=True
-    )
-
     class Meta:
         model = AuditLog
-        fields = [
-            "id",
-            "user",
-            "username",
-            "action",
-            "action_display",
-            "details",
-            "timestamp",
-        ]
-        read_only_fields = fields
+        fields = ["id", "user", "username", "action", "details", "timestamp"]
+        read_only_fields = ["id", "timestamp"]

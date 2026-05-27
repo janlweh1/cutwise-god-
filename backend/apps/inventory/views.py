@@ -1,22 +1,11 @@
-from django.db import models as db_models
 from rest_framework import viewsets, filters, status
 from rest_framework.response import Response
-from .models import (
-    Category,
-    Product,
-    StockMovement,
-    Supplier,
-    Material,
-    ScrapInventory,
-    AuditLog,
-)
+from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 from .serializers import (
-    CategorySerializer,
-    ProductSerializer,
-    StockMovementSerializer,
     SupplierSerializer,
     MaterialSerializer,
-    ScrapInventorySerializer,
+    ScrapSerializer,
+    ScrapSaleSerializer,
     AuditLogSerializer,
 )
 
@@ -29,8 +18,10 @@ def log_action(user, action, details=""):
     """Write an entry to the AuditLog table."""
     username = ""
     if user and user.is_authenticated:
-        full_name = getattr(user, "supabase_full_name", "") or user.first_name
-        username = full_name or user.email or str(user)
+        try:
+            username = user.profile.full_name or user.email or str(user)
+        except Exception:
+            username = user.email or str(user)
     AuditLog.objects.create(
         user=user if (user and user.is_authenticated) else None,
         username=username,
@@ -40,41 +31,7 @@ def log_action(user, action, details=""):
 
 
 # ──────────────────────────────────────────────
-# Legacy ViewSets (kept for backward-compat)
-# ──────────────────────────────────────────────
-
-class CategoryViewSet(viewsets.ModelViewSet):
-    """CRUD operations for product categories."""
-
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    search_fields = ["name"]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    ordering_fields = ["name", "created_at"]
-
-
-class ProductViewSet(viewsets.ModelViewSet):
-    """CRUD operations for inventory products."""
-
-    queryset = Product.objects.select_related("category").all()
-    serializer_class = ProductSerializer
-    search_fields = ["name", "sku", "description"]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    ordering_fields = ["name", "price", "quantity", "created_at"]
-
-
-class StockMovementViewSet(viewsets.ModelViewSet):
-    """CRUD operations for stock movements."""
-
-    queryset = StockMovement.objects.select_related("product").all()
-    serializer_class = StockMovementSerializer
-    search_fields = ["product__name", "reference"]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    ordering_fields = ["created_at", "movement_type"]
-
-
-# ──────────────────────────────────────────────
-# Sprint 1 — Supplier
+# Supplier
 # ──────────────────────────────────────────────
 
 class SupplierViewSet(viewsets.ModelViewSet):
@@ -84,21 +41,7 @@ class SupplierViewSet(viewsets.ModelViewSet):
     serializer_class = SupplierSerializer
     search_fields = ["name", "contact_person"]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    ordering_fields = ["name", "created_at"]
-
-    def create(self, request, *args, **kwargs):
-        import traceback
-        print(f"\n[DEBUG] SupplierViewSet.create called")
-        print(f"[DEBUG] request.data = {request.data}")
-        print(f"[DEBUG] request.user = {request.user}, authenticated = {request.user.is_authenticated}")
-        try:
-            response = super().create(request, *args, **kwargs)
-            print(f"[DEBUG] create succeeded, status = {response.status_code}")
-            return response
-        except Exception as e:
-            print(f"[DEBUG] create FAILED: {e}")
-            traceback.print_exc()
-            raise
+    ordering_fields = ["name"]
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -110,49 +53,49 @@ class SupplierViewSet(viewsets.ModelViewSet):
 
 
 # ──────────────────────────────────────────────
-# Sprint 1 — Material
+# Material
 # ──────────────────────────────────────────────
 
 class MaterialViewSet(viewsets.ModelViewSet):
     """CRUD operations for raw materials."""
 
-    queryset = Material.objects.select_related("supplier").all()
+    queryset = Material.objects.select_related("supplier", "added_by").all()
     serializer_class = MaterialSerializer
-    search_fields = ["name", "material_type"]
+    search_fields = ["material_name", "material_type"]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    ordering_fields = ["name", "quantity", "unit_cost", "created_at"]
-    filterset_fields = ["material_type", "supplier"]
+    ordering_fields = ["material_name", "quantity", "unit_cost", "last_update"]
 
     def get_queryset(self):
         qs = super().get_queryset()
-        # Optional query-param filter for stock status
         stock_status = self.request.query_params.get("stock_status")
         if stock_status == "low_stock":
-            qs = qs.filter(quantity__gt=0, quantity__lte=db_models.F("reorder_level"))
+            from django.db import models as db_models
+            qs = qs.filter(quantity__gt=0, quantity__lte=db_models.F("min_stock"))
         elif stock_status == "out_of_stock":
             qs = qs.filter(quantity=0)
         elif stock_status == "in_stock":
-            qs = qs.filter(quantity__gt=db_models.F("reorder_level"))
+            from django.db import models as db_models
+            qs = qs.filter(quantity__gt=db_models.F("min_stock"))
         return qs
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(added_by=self.request.user)
         log_action(
             self.request.user,
             AuditLog.ActionType.MATERIAL_ADDED,
-            f"Added material: {instance.name} ({instance.get_material_type_display()}) — Qty: {instance.quantity}",
+            f"Added material: {instance.material_name} ({instance.get_material_type_display()}) — Qty: {instance.quantity}",
         )
 
     def perform_update(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(added_by=self.request.user)
         log_action(
             self.request.user,
             AuditLog.ActionType.MATERIAL_UPDATED,
-            f"Updated material: {instance.name} ({instance.get_material_type_display()}) — Qty: {instance.quantity}",
+            f"Updated material: {instance.material_name} ({instance.get_material_type_display()}) — Qty: {instance.quantity}",
         )
 
     def perform_destroy(self, instance):
-        name = instance.name
+        name = instance.material_name
         log_action(
             self.request.user,
             AuditLog.ActionType.MATERIAL_DELETED,
@@ -162,34 +105,64 @@ class MaterialViewSet(viewsets.ModelViewSet):
 
 
 # ──────────────────────────────────────────────
-# Sprint 1 — Scrap Inventory
+# Scrap
 # ──────────────────────────────────────────────
 
-class ScrapInventoryViewSet(viewsets.ModelViewSet):
-    """CRUD operations for scrap inventory records."""
+class ScrapViewSet(viewsets.ModelViewSet):
+    """CRUD operations for scrap inventory."""
 
-    queryset = ScrapInventory.objects.all()
-    serializer_class = ScrapInventorySerializer
-    search_fields = ["source_batch", "material_type"]
+    queryset = Scrap.objects.select_related("material").all()
+    serializer_class = ScrapSerializer
+    search_fields = ["material__material_name", "status"]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    ordering_fields = ["created_at", "weight_kg", "value"]
+    ordering_fields = ["recorded_date", "weight_kg", "status"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        action = (
-            AuditLog.ActionType.SCRAP_CONVERTED
-            if instance.source == "conversion"
-            else AuditLog.ActionType.SCRAP_RECORDED
-        )
         log_action(
             self.request.user,
-            action,
-            f"Scrap {instance.get_material_type_display()} — {instance.weight_kg} kg, Value: ₱{instance.value}",
+            AuditLog.ActionType.SCRAP_RECORDED,
+            f"Scrap recorded from {instance.material.material_name} — {instance.weight_kg} kg",
         )
 
 
 # ──────────────────────────────────────────────
-# Sprint 1 — Audit Log (read-only)
+# Scrap Sale
+# ──────────────────────────────────────────────
+
+class ScrapSaleViewSet(viewsets.ModelViewSet):
+    """CRUD operations for scrap sale transactions."""
+
+    queryset = ScrapSale.objects.select_related("scrap__material", "sold_by").all()
+    serializer_class = ScrapSaleSerializer
+    search_fields = ["scrap__material__material_name"]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    ordering_fields = ["sale_date", "total_amount", "profit"]
+
+    def perform_create(self, serializer):
+        instance = serializer.save(sold_by=self.request.user)
+
+        # Mark the scrap as sold
+        scrap = instance.scrap
+        scrap.status = Scrap.ScrapStatus.SOLD
+        scrap.save(update_fields=["status"])
+
+        log_action(
+            self.request.user,
+            AuditLog.ActionType.SCRAP_SOLD,
+            f"Sold scrap from {scrap.material.material_name} — {instance.quantity_sold} kg @ ₱{instance.sale_price_per_kg}/kg — Total: ₱{instance.total_amount}",
+        )
+
+
+# ──────────────────────────────────────────────
+# Audit Log (read-only)
 # ──────────────────────────────────────────────
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

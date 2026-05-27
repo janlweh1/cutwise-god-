@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
-import { supabase } from "../lib/supabaseClient";
+import api, { saveTokens, clearTokens, getAccessToken } from "../lib/api";
 import { logRemote } from "../lib/logger";
 
 const AuthContext = createContext({});
@@ -8,42 +8,40 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
   const [role, setRole] = useState(null);
   const [fullName, setFullName] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Inactivity detection refs
   const inactivityTimerRef = useRef(null);
-  const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes in milliseconds
+  const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
 
   // Lockout parameters
   const LOCKOUT_ATTEMPTS = 5;
-  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
+  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 
-  // Reset inactivity timer
+  // ─── Inactivity timer ─────────────────────────────────────────────────────
+
   const resetInactivityTimer = () => {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
-    
-    // Only set timer if user is authenticated
-    if (session) {
+    if (user) {
       inactivityTimerRef.current = setTimeout(() => {
         handleAutoLogout();
       }, INACTIVITY_LIMIT);
     }
   };
 
-  // Perform automatic logout on inactivity
   const handleAutoLogout = async () => {
-    console.log("Auto-logging out due to inactivity");
+    logRemote("Auto-logging out due to inactivity", "warn");
     await signOut();
     alert("You have been signed out due to 30 minutes of inactivity.");
     window.location.href = "/";
   };
 
-  // Check and update failed login attempts
+  // ─── Lockout helpers ──────────────────────────────────────────────────────
+
   const checkLockout = (email) => {
     const attemptsData = localStorage.getItem(`auth_attempts_${email}`);
     if (!attemptsData) return { isLocked: false };
@@ -54,7 +52,6 @@ export const AuthProvider = ({ children }) => {
       return { isLocked: true, remainingMinutes };
     }
 
-    // Lockout expired, reset
     if (lockUntil && Date.now() >= lockUntil) {
       localStorage.removeItem(`auth_attempts_${email}`);
     }
@@ -70,7 +67,6 @@ export const AuthProvider = ({ children }) => {
     if (attemptsData) {
       const parsed = JSON.parse(attemptsData);
       count = parsed.count + 1;
-      
       if (count >= LOCKOUT_ATTEMPTS) {
         lockUntil = Date.now() + LOCKOUT_TIME;
       }
@@ -88,41 +84,11 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem(`auth_attempts_${email}`);
   };
 
-  // Fetch role from profiles table
-  const fetchUserProfile = async (userId) => {
-    logRemote(`fetchUserProfile started for userId: ${userId}`, "info");
-    try {
-      logRemote(`Testing raw fetch to profiles for userId: ${userId}`, "info");
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=role,full_name`;
-      const response = await fetch(url, {
-        headers: {
-          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        }
-      });
-      logRemote(`Raw fetch response status: ${response.status}`, "info");
-      const text = await response.text();
-      logRemote(`Raw fetch response body: ${text}`, "info");
-      
-      const parsed = JSON.parse(text);
-      if (parsed && parsed.length > 0) {
-        logRemote(`fetchUserProfile completed. role: ${parsed[0].role}, name: ${parsed[0].full_name}`, "info");
-        return parsed[0];
-      }
-      
-      logRemote("fetchUserProfile completed. Profile not found", "warn");
-      return null;
-    } catch (e) {
-      logRemote(`fetchUserProfile unexpected exception: ${e.message || e}`, "error");
-      console.error("Unexpected profile fetch error:", e);
-      return null;
-    }
-  };
+  // ─── Auth actions ─────────────────────────────────────────────────────────
 
-  // Sign In implementation
   const signIn = async (email, password) => {
     logRemote(`signIn started for email: ${email}`, "info");
-    // 1. Check lockout status
+
     const lockoutStatus = checkLockout(email);
     if (lockoutStatus.isLocked) {
       logRemote(`signIn aborted: account locked for ${email}`, "warn");
@@ -131,16 +97,25 @@ export const AuthProvider = ({ children }) => {
       );
     }
 
-    // 2. Perform Supabase authentication
-    logRemote(`Calling supabase.auth.signInWithPassword for ${email}`, "info");
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      logRemote(`Calling /auth/login/ for ${email}`, "info");
+      const { data } = await api.post("/auth/login/", { username: email, password });
 
-    if (error) {
-      logRemote(`supabase.auth.signInWithPassword returned error: ${error.message}`, "error");
-      // Register failed attempt
+      // Save tokens
+      saveTokens({ access: data.access, refresh: data.refresh });
+
+      // Update state
+      setUser({ email, id: data.user_id });
+      setRole(data.role);
+      setFullName(data.full_name);
+
+      clearFailures(email);
+      logRemote(`signIn succeeded. role: ${data.role}`, "info");
+
+      return data;
+    } catch (err) {
+      logRemote(`signIn failed: ${err.response?.data?.detail || err.message}`, "error");
+
       const failureStatus = registerFailure(email);
       if (failureStatus.isLocked) {
         throw new Error(
@@ -153,66 +128,47 @@ export const AuthProvider = ({ children }) => {
         );
       }
     }
-
-    logRemote(`supabase.auth.signInWithPassword succeeded for ${email}. user_id: ${data?.user?.id}`, "info");
-    // 3. Clear failures on success
-    clearFailures(email);
-    return data;
   };
 
-  // Sign Out implementation
   const signOut = async () => {
     logRemote("signOut started", "info");
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
-    await supabase.auth.signOut();
+    clearTokens();
     setUser(null);
-    setSession(null);
     setRole(null);
     setFullName(null);
     logRemote("signOut completed", "info");
   };
 
-  // Read Supabase session from localStorage (avoids hanging getSession() call)
-  const getSessionFromStorage = () => {
-    try {
-      const ref = new URL(import.meta.env.VITE_SUPABASE_URL).hostname.split(".")[0];
-      const storageKey = `sb-${ref}-auth-token`;
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (e) {
-      return null;
-    }
-  };
+  // ─── Session restore on app load ──────────────────────────────────────────
 
-  // Initialize and track auth states
   useEffect(() => {
     let isMounted = true;
 
     const initAuth = async () => {
       logRemote("initAuth started", "info");
+      const token = getAccessToken();
+
+      if (!token) {
+        logRemote("initAuth: no token in localStorage", "info");
+        if (isMounted) setLoading(false);
+        return;
+      }
+
       try {
-        // Read session from localStorage instead of supabase.auth.getSession()
-        const storedSession = getSessionFromStorage();
-        
-        if (storedSession?.user) {
-          logRemote(`initAuth session found for: ${storedSession.user.email}`, "info");
-          setSession(storedSession);
-          setUser(storedSession.user);
-          
-          const profile = await fetchUserProfile(storedSession.user.id);
-          if (isMounted && profile) {
-            setRole(profile.role);
-            setFullName(profile.full_name);
-          }
-        } else {
-          logRemote("initAuth: no session found in localStorage", "info");
+        logRemote("initAuth: fetching /auth/me/", "info");
+        const { data } = await api.get("/auth/me/");
+        if (isMounted) {
+          setUser({ email: data.email, id: data.id });
+          setRole(data.role);
+          setFullName(data.full_name);
+          logRemote(`initAuth: session restored for ${data.email} (${data.role})`, "info");
         }
       } catch (err) {
-        logRemote(`initAuth error: ${err.message || err}`, "error");
-        console.error("Error in initAuth:", err);
+        logRemote(`initAuth: failed to restore session — ${err.message}`, "warn");
+        clearTokens();
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -221,9 +177,7 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    initAuth();
-
-    // Safety: force loading=false after 5 seconds in case anything hangs
+    // Safety: force loading=false after 5 seconds if anything hangs
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
         setLoading(false);
@@ -231,80 +185,37 @@ export const AuthProvider = ({ children }) => {
       }
     }, 5000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        logRemote(`onAuthStateChange event: ${event}, session_exists: ${!!newSession}`, "info");
-        try {
-          if (newSession) {
-            // Don't set loading=true here — it causes the dashboard to show 
-            // infinite spinner when the profile fetch is slow.
-            setSession(newSession);
-            setUser(newSession.user);
-
-            const profile = await fetchUserProfile(newSession.user.id);
-            if (isMounted && profile) {
-              setRole(profile.role);
-              setFullName(profile.full_name);
-            }
-          } else {
-            setSession(null);
-            setUser(null);
-            setRole(null);
-            setFullName(null);
-          }
-        } catch (err) {
-          logRemote(`onAuthStateChange error: ${err.message || err}`, "error");
-          console.error("Error in onAuthStateChange:", err);
-        } finally {
-          if (isMounted) {
-            setLoading(false);
-            logRemote("onAuthStateChange completed", "info");
-          }
-        }
-      }
-    );
+    initAuth();
 
     return () => {
       isMounted = false;
       clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
     };
   }, []);
 
-  // Listen for user activity events when session is active
+  // ─── Inactivity listeners ─────────────────────────────────────────────────
+
   useEffect(() => {
-    if (!session) return;
+    if (!user) return;
 
     const activityEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    
-    // Initialize timer
     resetInactivityTimer();
-
-    // Attach listeners
-    activityEvents.forEach((event) => {
-      window.addEventListener(event, resetInactivityTimer);
-    });
+    activityEvents.forEach((event) => window.addEventListener(event, resetInactivityTimer));
 
     return () => {
-      // Remove listeners
-      activityEvents.forEach((event) => {
-        window.removeEventListener(event, resetInactivityTimer);
-      });
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
+      activityEvents.forEach((event) => window.removeEventListener(event, resetInactivityTimer));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     };
-  }, [session]);
+  }, [user]);
 
   const value = {
     user,
-    session,
     role,
     fullName,
     loading,
     signIn,
     signOut,
-    checkLockout
+    checkLockout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

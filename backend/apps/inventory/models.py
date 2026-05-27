@@ -1,14 +1,13 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import User
-from apps.core.models import TimeStampedModel
 
 
 # ──────────────────────────────────────────────
 # Supplier
 # ──────────────────────────────────────────────
 
-class Supplier(TimeStampedModel):
+class Supplier(models.Model):
     """Supplier reference for raw material sourcing."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -16,8 +15,6 @@ class Supplier(TimeStampedModel):
     contact_person = models.CharField(max_length=255, blank=True, default="")
     phone = models.CharField(max_length=50, blank=True, default="")
     email = models.EmailField(blank=True, default="")
-    address = models.TextField(blank=True, default="")
-    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["name"]
@@ -27,29 +24,10 @@ class Supplier(TimeStampedModel):
 
 
 # ──────────────────────────────────────────────
-# Category  (kept for backward-compat)
+# Material
 # ──────────────────────────────────────────────
 
-class Category(TimeStampedModel):
-    """Product category for organizing inventory items."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, unique=True)
-    description = models.TextField(blank=True, default="")
-
-    class Meta:
-        verbose_name_plural = "categories"
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
-
-# ──────────────────────────────────────────────
-# Material  (primary inventory item)
-# ──────────────────────────────────────────────
-
-class Material(TimeStampedModel):
+class Material(models.Model):
     """Raw material tracked in the inventory."""
 
     class MaterialType(models.TextChoices):
@@ -71,7 +49,22 @@ class Material(TimeStampedModel):
         OUT_OF_STOCK = "out_of_stock", "Out of Stock"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255)
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="materials",
+    )
+    added_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="materials_added",
+        help_text="The user who added or last updated this material.",
+    )
+    material_name = models.CharField(max_length=255)
     material_type = models.CharField(
         max_length=20,
         choices=MaterialType.choices,
@@ -83,33 +76,29 @@ class Material(TimeStampedModel):
     )
     quantity = models.PositiveIntegerField(default=0)
     unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    supplier = models.ForeignKey(
-        Supplier,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="materials",
+    min_stock = models.PositiveIntegerField(
+        default=10,
+        help_text="Minimum stock level before a low-stock alert is raised.",
     )
-    reorder_level = models.PositiveIntegerField(default=10)
-    is_active = models.BooleanField(default=True)
+    last_update = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["material_name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["name", "material_type", "supplier"],
+                fields=["material_name", "material_type", "supplier"],
                 name="unique_material_per_supplier",
             )
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.get_material_type_display()})"
+        return f"{self.material_name} ({self.get_material_type_display()})"
 
     @property
     def stock_status(self):
         if self.quantity == 0:
             return self.StockStatus.OUT_OF_STOCK
-        if self.quantity <= self.reorder_level:
+        if self.quantity <= self.min_stock:
             return self.StockStatus.LOW_STOCK
         return self.StockStatus.IN_STOCK
 
@@ -119,110 +108,76 @@ class Material(TimeStampedModel):
 
 
 # ──────────────────────────────────────────────
-# Product  (kept for backward-compat)
+# Scrap
 # ──────────────────────────────────────────────
 
-class Product(TimeStampedModel):
-    """Inventory product / item."""
+class Scrap(models.Model):
+    """
+    Scrap leather produced from cutting operations.
+    Links to the Material it was cut from and tracks its availability for sale.
+    """
+
+    class ScrapStatus(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        SOLD = "sold", "Sold"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255)
-    sku = models.CharField(max_length=100, unique=True, verbose_name="SKU")
-    description = models.TextField(blank=True, default="")
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="products",
-    )
-    price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    quantity = models.PositiveIntegerField(default=0)
-    reorder_level = models.PositiveIntegerField(default=10)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return f"{self.name} ({self.sku})"
-
-    @property
-    def is_low_stock(self):
-        return self.quantity <= self.reorder_level
-
-
-# ──────────────────────────────────────────────
-# StockMovement  (kept for backward-compat)
-# ──────────────────────────────────────────────
-
-class StockMovement(TimeStampedModel):
-    """Tracks inventory stock movements (in/out)."""
-
-    class MovementType(models.TextChoices):
-        IN = "IN", "Stock In"
-        OUT = "OUT", "Stock Out"
-        ADJUSTMENT = "ADJ", "Adjustment"
-        RETURN = "RET", "Return"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, related_name="movements"
-    )
-    movement_type = models.CharField(max_length=3, choices=MovementType.choices)
-    quantity = models.IntegerField()
-    reference = models.CharField(max_length=255, blank=True, default="")
-    notes = models.TextField(blank=True, default="")
-
-    def __str__(self):
-        return f"{self.get_movement_type_display()} — {self.product.name} x{self.quantity}"
-
-
-# ──────────────────────────────────────────────
-# Scrap Inventory
-# ──────────────────────────────────────────────
-
-class ScrapInventory(TimeStampedModel):
-    """Scrap leather recorded from the Sales & Cutting subsystem
-    or converted manually by an Inventory Clerk."""
-
-    class ScrapSource(models.TextChoices):
-        CUTTING = "cutting", "Cutting Leftover"
-        CONVERSION = "conversion", "Manual Conversion"
-        INTEGRATION = "integration", "API Integration"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    source_batch = models.CharField(
-        max_length=255, blank=True, default="",
-        help_text="Batch reference from the Sales & Cutting subsystem",
-    )
-    material_type = models.CharField(
-        max_length=20,
-        choices=Material.MaterialType.choices,
-        default=Material.MaterialType.OTHER,
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.CASCADE,
+        related_name="scraps",
+        help_text="The source material this scrap was cut from.",
     )
     weight_kg = models.DecimalField(
         max_digits=10, decimal_places=3, default=0,
-        help_text="Weight in kilograms",
+        help_text="Weight of the scrap in kilograms.",
     )
-    value = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0,
-        help_text="Computed monetary value of the scrap",
+    recorded_date = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=10,
+        choices=ScrapStatus.choices,
+        default=ScrapStatus.AVAILABLE,
     )
-    source = models.CharField(
-        max_length=20,
-        choices=ScrapSource.choices,
-        default=ScrapSource.CONVERSION,
-    )
-    notes = models.TextField(blank=True, default="")
 
     class Meta:
-        verbose_name_plural = "scrap inventory"
-        ordering = ["-created_at"]
+        ordering = ["-recorded_date"]
 
     def __str__(self):
-        return f"Scrap {self.get_material_type_display()} — {self.weight_kg} kg"
+        return f"Scrap from {self.material.material_name} — {self.weight_kg} kg ({self.status})"
+
+
+# ──────────────────────────────────────────────
+# Scrap Sale
+# ──────────────────────────────────────────────
+
+class ScrapSale(models.Model):
+    """Records a sale transaction for scrap material."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scrap = models.ForeignKey(
+        Scrap,
+        on_delete=models.CASCADE,
+        related_name="sales",
+    )
+    sold_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scrap_sales",
+        help_text="The user who processed this sale.",
+    )
+    quantity_sold = models.PositiveIntegerField(default=0)
+    sale_price_per_kg = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    sale_date = models.DateTimeField(auto_now_add=True)
+    profit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["-sale_date"]
+
+    def __str__(self):
+        return f"Sale of {self.scrap} — ₱{self.total_amount}"
 
 
 # ──────────────────────────────────────────────
@@ -237,7 +192,7 @@ class AuditLog(models.Model):
         MATERIAL_UPDATED = "material_updated", "Material Updated"
         MATERIAL_DELETED = "material_deleted", "Material Deleted"
         SCRAP_RECORDED = "scrap_recorded", "Scrap Recorded"
-        SCRAP_CONVERTED = "scrap_converted", "Scrap Converted"
+        SCRAP_SOLD = "scrap_sold", "Scrap Sold"
         STOCK_ADJUSTED = "stock_adjusted", "Stock Adjusted"
         SUPPLIER_ADDED = "supplier_added", "Supplier Added"
 

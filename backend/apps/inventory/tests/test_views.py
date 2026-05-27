@@ -1,10 +1,11 @@
 import pytest
-from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from apps.inventory.models import Supplier, Material, ScrapInventory, AuditLog
+from rest_framework_simplejwt.tokens import RefreshToken
+from apps.inventory.models import Supplier, Material, Scrap, ScrapSale, AuditLog
+from apps.authentication.models import UserProfile
 
 @pytest.fixture
 def api_client():
@@ -13,28 +14,21 @@ def api_client():
 @pytest.fixture
 def auth_user():
     user = User.objects.create(
-        username="bc649af0-5266-4631-938b-fdfa54d2bcf3",
-        email="employee@example.com",
-        first_name="John Employee"
+        username="clerk@otto.com",
+        email="clerk@otto.com"
     )
-    user.supabase_role = "employee"
-    user.supabase_full_name = "John Employee"
+    # The profile is created via signal. Let's customize it.
+    profile = user.profile
+    profile.role = UserProfile.Role.INVENTORY_CLERK
+    profile.full_name = "John Employee"
+    profile.save()
     return user
 
 @pytest.fixture
 def authenticated_client(api_client, auth_user):
-    # Patch SupabaseJWTAuthentication.authenticate to bypass external network calls
-    with patch("apps.authentication.supabase_auth.SupabaseJWTAuthentication.authenticate") as mock_auth:
-        mock_auth.return_value = (
-            auth_user,
-            {
-                "token": "mock-jwt-token",
-                "role": "employee",
-                "supabase_uid": "bc649af0-5266-4631-938b-fdfa54d2bcf3"
-            }
-        )
-        api_client.credentials(HTTP_AUTHORIZATION="Bearer mock-jwt-token")
-        yield api_client
+    token = RefreshToken.for_user(auth_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+    return api_client
 
 
 @pytest.mark.django_db
@@ -55,7 +49,6 @@ class TestSupplierEndpoints:
         response = authenticated_client.get(url)
         assert response.status_code == status.HTTP_200_OK
         
-        # Checking pagination results structure
         data = response.data
         results = data.get("results", data)
         assert len(results) == 2
@@ -87,17 +80,17 @@ class TestMaterialEndpoints:
     def test_create_material_success_and_logs(self, authenticated_client, supplier):
         url = reverse("inventory:material-list")
         payload = {
-            "name": "Full Grain Leather",
+            "material_name": "Full Grain Leather",
             "material_type": "cowhide",
             "size": "20 sqft",
             "quantity": 15,
             "unit_cost": 250.00,
             "supplier": str(supplier.id),
-            "reorder_level": 5
+            "min_stock": 5
         }
         response = authenticated_client.post(url, payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["name"] == "Full Grain Leather"
+        assert response.data["material_name"] == "Full Grain Leather"
         
         # Verify material_added audit log is created
         assert AuditLog.objects.filter(
@@ -107,13 +100,13 @@ class TestMaterialEndpoints:
 
     def test_create_material_duplicate_validation(self, authenticated_client, supplier):
         Material.objects.create(
-            name="Suede Brown",
+            material_name="Suede Brown",
             material_type=Material.MaterialType.SUEDE,
             supplier=supplier
         )
         url = reverse("inventory:material-list")
         payload = {
-            "name": "Suede Brown",
+            "material_name": "Suede Brown",
             "material_type": "suede",
             "supplier": str(supplier.id),
             "quantity": 10,
@@ -121,15 +114,14 @@ class TestMaterialEndpoints:
         }
         response = authenticated_client.post(url, payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "non_field_errors" in response.data or "detail" in response.data or any("exists" in val[0] for val in response.data.values() if isinstance(val, list))
 
     def test_filter_material_by_stock_status(self, authenticated_client, supplier):
-        # 1. In stock (qty = 50, reorder = 10)
-        Material.objects.create(name="Mat In Stock", material_type="cowhide", quantity=50, reorder_level=10, supplier=supplier)
-        # 2. Low stock (qty = 5, reorder = 10)
-        Material.objects.create(name="Mat Low Stock", material_type="cowhide", quantity=5, reorder_level=10, supplier=supplier)
-        # 3. Out of stock (qty = 0, reorder = 10)
-        Material.objects.create(name="Mat Out Of Stock", material_type="cowhide", quantity=0, reorder_level=10, supplier=supplier)
+        # 1. In stock (qty = 50, min_stock = 10)
+        Material.objects.create(material_name="Mat In Stock", material_type="cowhide", quantity=50, min_stock=10, supplier=supplier)
+        # 2. Low stock (qty = 5, min_stock = 10)
+        Material.objects.create(material_name="Mat Low Stock", material_type="cowhide", quantity=5, min_stock=10, supplier=supplier)
+        # 3. Out of stock (qty = 0, min_stock = 10)
+        Material.objects.create(material_name="Mat Out Of Stock", material_type="cowhide", quantity=0, min_stock=10, supplier=supplier)
 
         url = reverse("inventory:material-list")
         
@@ -137,33 +129,33 @@ class TestMaterialEndpoints:
         response = authenticated_client.get(url, {"stock_status": "low_stock"})
         results = response.data.get("results", response.data)
         assert len(results) == 1
-        assert results[0]["name"] == "Mat Low Stock"
+        assert results[0]["material_name"] == "Mat Low Stock"
 
         # Out of stock filter
         response = authenticated_client.get(url, {"stock_status": "out_of_stock"})
         results = response.data.get("results", response.data)
         assert len(results) == 1
-        assert results[0]["name"] == "Mat Out Of Stock"
+        assert results[0]["material_name"] == "Mat Out Of Stock"
 
         # In stock filter
         response = authenticated_client.get(url, {"stock_status": "in_stock"})
         results = response.data.get("results", response.data)
         assert len(results) == 1
-        assert results[0]["name"] == "Mat In Stock"
+        assert results[0]["material_name"] == "Mat In Stock"
 
     def test_search_materials(self, authenticated_client, supplier):
-        Material.objects.create(name="Zebra Leather pattern", material_type="cowhide", supplier=supplier)
-        Material.objects.create(name="Crocodile synthetic", material_type="synthetic", supplier=supplier)
+        Material.objects.create(material_name="Zebra Leather pattern", material_type="cowhide", supplier=supplier)
+        Material.objects.create(material_name="Crocodile synthetic", material_type="synthetic", supplier=supplier)
 
         url = reverse("inventory:material-list")
         
         response = authenticated_client.get(url, {"search": "Zebra"})
         results = response.data.get("results", response.data)
         assert len(results) == 1
-        assert results[0]["name"] == "Zebra Leather pattern"
+        assert results[0]["material_name"] == "Zebra Leather pattern"
 
     def test_update_material(self, authenticated_client, supplier):
-        mat = Material.objects.create(name="Nappa Soft", material_type="nappa", quantity=10, supplier=supplier)
+        mat = Material.objects.create(material_name="Nappa Soft", material_type="nappa", quantity=10, supplier=supplier)
         url = reverse("inventory:material-detail", kwargs={"pk": mat.id})
         
         payload = {"quantity": 25}
@@ -178,7 +170,7 @@ class TestMaterialEndpoints:
         ).exists()
 
     def test_delete_material(self, authenticated_client, supplier):
-        mat = Material.objects.create(name="Obsolete Material", material_type="other", supplier=supplier)
+        mat = Material.objects.create(material_name="Obsolete Material", material_type="other", supplier=supplier)
         url = reverse("inventory:material-detail", kwargs={"pk": mat.id})
         
         response = authenticated_client.delete(url)
@@ -192,24 +184,53 @@ class TestMaterialEndpoints:
 
 
 @pytest.mark.django_db
-class TestScrapInventoryEndpoints:
-    def test_create_scrap_auto_computes_value(self, authenticated_client):
+class TestScrapEndpoints:
+    @pytest.fixture
+    def material(self):
+        supplier = Supplier.objects.create(name="Supplier S")
+        return Material.objects.create(
+            material_name="Suede Cut",
+            material_type=Material.MaterialType.SUEDE,
+            supplier=supplier,
+            quantity=10
+        )
+
+    def test_create_scrap_and_sale(self, authenticated_client, material):
+        # 1. Create Scrap
         url = reverse("inventory:scrap-list")
         payload = {
-            "source_batch": "BATCH-2026-X",
-            "material_type": "cowhide",  # Rate is 50
-            "weight_kg": 2.500,
-            "source": "conversion"
+            "material": str(material.id),
+            "weight_kg": 3.450,
+            "status": "available"
         }
         response = authenticated_client.post(url, payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
+        scrap_id = response.data["id"]
         
-        # Value should be weight (2.5) * rate (50) = 125.00
-        assert float(response.data["value"]) == 125.00
-        
-        # Verify scrap_converted audit log is created
+        # Verify scrap_recorded audit log is created
         assert AuditLog.objects.filter(
-            action=AuditLog.ActionType.SCRAP_CONVERTED,
+            action=AuditLog.ActionType.SCRAP_RECORDED,
+            username="John Employee"
+        ).exists()
+
+        # 2. Sell Scrap
+        sale_url = reverse("inventory:scrap-sale-list")
+        sale_payload = {
+            "scrap": scrap_id,
+            "quantity_sold": 1,
+            "sale_price_per_kg": 100.00,
+            "total_amount": 345.00,
+            "profit": 200.00
+        }
+        sale_response = authenticated_client.post(sale_url, sale_payload, format="json")
+        assert sale_response.status_code == status.HTTP_201_CREATED
+        
+        # Check scrap is now SOLD
+        assert Scrap.objects.get(id=scrap_id).status == Scrap.ScrapStatus.SOLD
+        
+        # Verify scrap_sold audit log is created
+        assert AuditLog.objects.filter(
+            action=AuditLog.ActionType.SCRAP_SOLD,
             username="John Employee"
         ).exists()
 

@@ -48,7 +48,7 @@ export const ProtectedRoute = ({ children, requiredRole }) => {
     // Redirect to their own dashboard if role exists
     if (role === "admin") return <Navigate to="/dashboard/admin" replace />;
     if (role === "supervisor") return <Navigate to="/dashboard/supervisor" replace />;
-    if (role === "employee") return <Navigate to="/dashboard/employee" replace />;
+    if (role === "inventory_clerk") return <Navigate to="/dashboard/inventory_clerk" replace />;
     
     return <Navigate to="/" replace />;
   }

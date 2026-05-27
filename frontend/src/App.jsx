@@ -20,9 +20,9 @@ function App() {
 
           {/* Protected Dashboards */}
           <Route 
-            path="/dashboard/employee" 
+            path="/dashboard/inventory_clerk" 
             element={
-              <ProtectedRoute requiredRole="employee">
+              <ProtectedRoute requiredRole="inventory_clerk">
                 <EmployeeDashboard />
               </ProtectedRoute>
             } 
