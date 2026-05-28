@@ -5,6 +5,7 @@ import InventoryView from "./views/InventoryView";
 import ScrapView from "./views/ScrapView";
 import SupplierView from "./views/SupplierView";
 import ReportsView from "./views/ReportsView";
+import DeliveryView from "./views/DeliveryView";
 import "../../styles/dashboard.css";
 
 /* ── Simple Home View for Supervisor ──────────── */
@@ -58,6 +59,8 @@ export const SupervisorDashboard = () => {
         return <ScrapView />;
       case "supplier":
         return <SupplierView />;
+      case "delivery":
+        return <DeliveryView />;
       case "reports":
         return <ReportsView />;
       default:

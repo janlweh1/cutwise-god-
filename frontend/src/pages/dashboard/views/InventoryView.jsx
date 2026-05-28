@@ -29,13 +29,14 @@ const MATERIAL_TYPES = [
 
 /* ── Empty form state ────────────────────────── */
 const emptyForm = {
-  name: "",
+  material_name: "",
   material_type: "other",
-  size: "",
+  size_val: "",
+  size_unit: "sqft",
   quantity: "",
   unit_cost: "",
   supplier: "",
-  reorder_level: "10",
+  min_stock: "10",
 };
 
 export const InventoryView = () => {
@@ -101,14 +102,19 @@ export const InventoryView = () => {
   };
 
   const openEditModal = (mat) => {
+    const match = mat.size ? mat.size.match(/^([\d.]+)\s*(.*)$/) : null;
+    const size_val = match ? match[1] : (mat.size || "");
+    const size_unit = match && match[2].trim() ? match[2].trim() : "sqft";
+
     setForm({
-      name: mat.name,
+      material_name: mat.material_name,
       material_type: mat.material_type,
-      size: mat.size || "",
+      size_val: size_val,
+      size_unit: size_unit,
       quantity: String(mat.quantity),
       unit_cost: String(mat.unit_cost),
       supplier: mat.supplier || "",
-      reorder_level: String(mat.reorder_level),
+      min_stock: String(mat.min_stock),
     });
     setEditingId(mat.id);
     setErrors({});
@@ -133,7 +139,7 @@ export const InventoryView = () => {
   /* ── Validate ────────────────────────────────── */
   const validate = () => {
     const errs = {};
-    if (!form.name.trim()) errs.name = "Material name is required.";
+    if (!form.material_name.trim()) errs.material_name = "Material name is required.";
     if (!form.quantity || Number(form.quantity) < 0) errs.quantity = "Valid quantity is required.";
     if (!form.unit_cost || Number(form.unit_cost) < 0) errs.unit_cost = "Valid unit cost is required.";
     if (!form.supplier) errs.supplier = "Supplier is required.";
@@ -148,13 +154,13 @@ export const InventoryView = () => {
     setSubmitting(true);
     try {
       const payload = {
-        name: form.name.trim(),
+        material_name: form.material_name.trim(),
         material_type: form.material_type,
-        size: form.size.trim(),
+        size: form.size_val ? `${String(form.size_val).trim()} ${form.size_unit}` : "",
         quantity: Number(form.quantity),
         unit_cost: Number(form.unit_cost),
         supplier: form.supplier || null,
-        reorder_level: Number(form.reorder_level) || 10,
+        min_stock: Number(form.min_stock) || 10,
       };
       if (editingId) {
         await api.patch(`/inventory/materials/${editingId}/`, payload);
@@ -249,7 +255,7 @@ export const InventoryView = () => {
             <tbody>
               {displayed.map((mat) => (
                 <tr key={mat.id} className={mat.stock_status === "low_stock" ? "row-warning" : mat.stock_status === "out_of_stock" ? "row-danger" : ""}>
-                  <td className="td-bold">{mat.name}</td>
+                  <td className="td-bold">{mat.material_name}</td>
                   <td>{MATERIAL_TYPES.find((t) => t.value === mat.material_type)?.label || mat.material_type}</td>
                   <td>{mat.size || "—"}</td>
                   <td>{mat.quantity}</td>
@@ -284,8 +290,8 @@ export const InventoryView = () => {
 
               <div className="form-group">
                 <label>Material Name *</label>
-                <input name="name" value={form.name} onChange={handleChange} placeholder="e.g., Full Grain Cowhide" />
-                {errors.name && <span className="form-error">{errors.name}</span>}
+                <input name="material_name" value={form.material_name} onChange={handleChange} placeholder="e.g., Full Grain Cowhide" />
+                {errors.material_name && <span className="form-error">{errors.material_name}</span>}
               </div>
 
               <div className="form-row-2">
@@ -299,7 +305,31 @@ export const InventoryView = () => {
                 </div>
                 <div className="form-group">
                   <label>Size</label>
-                  <input name="size" value={form.size} onChange={handleChange} placeholder="e.g., 12 sqft" />
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      name="size_val"
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={form.size_val}
+                      onChange={handleChange}
+                      placeholder="e.g., 12"
+                      style={{ flex: 1 }}
+                    />
+                    <select
+                      name="size_unit"
+                      value={form.size_unit}
+                      onChange={handleChange}
+                      style={{ width: "100px" }}
+                    >
+                      <option value="sqft">sqft</option>
+                      <option value="sqm">sqm</option>
+                      <option value="meters">meters</option>
+                      <option value="rolls">rolls</option>
+                      <option value="ml">ml</option>
+                      <option value="liters">liters</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -329,7 +359,7 @@ export const InventoryView = () => {
                 </div>
                 <div className="form-group">
                   <label>Reorder Level</label>
-                  <input name="reorder_level" type="number" min="0" value={form.reorder_level} onChange={handleChange} />
+                  <input name="min_stock" type="number" min="0" value={form.min_stock} onChange={handleChange} />
                 </div>
               </div>
 

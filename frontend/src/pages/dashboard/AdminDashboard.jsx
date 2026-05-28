@@ -6,6 +6,7 @@ import InventoryView from "./views/InventoryView";
 import ScrapView from "./views/ScrapView";
 import SupplierView from "./views/SupplierView";
 import ReportsView from "./views/ReportsView";
+import DeliveryView from "./views/DeliveryView";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -304,6 +305,8 @@ export const AdminDashboard = () => {
         return <ScrapView />;
       case "supplier":
         return <SupplierView />;
+      case "delivery":
+        return <DeliveryView />;
       case "reports":
         return <ReportsView />;
       case "settings":

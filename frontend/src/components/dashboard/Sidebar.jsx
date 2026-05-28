@@ -102,7 +102,7 @@ const Sidebar = ({ collapsed, onToggle, activeItem, onNavClick, userName, userRo
   ).map((item) => {
     // Customize menu labels specifically for the inventory_clerk role to match the screenshot
     if (role === "inventory_clerk") {
-      if (item.id === "inventory") return { ...item, label: "Inventory(Raw)" };
+      if (item.id === "inventory") return { ...item, label: "Inventory (Raw)" };
       if (item.id === "supplier") return { ...item, label: "Suppliers" };
       if (item.id === "scrap") return { ...item, label: "Scrap" };
     }
@@ -112,10 +112,10 @@ const Sidebar = ({ collapsed, onToggle, activeItem, onNavClick, userName, userRo
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* Header */}
-      <div className="sidebar-header">
-        <img src={logoImg} className="sidebar-logo" alt="OTTO Logo" />
-        <span className="sidebar-brand">Otto Shoes</span>
-        <button className="sidebar-toggle" onClick={onToggle} aria-label="Toggle sidebar">
+      <div className="sidebar-header" style={collapsed ? { justifyContent: "center" } : undefined}>
+        {!collapsed && <img src={logoImg} className="sidebar-logo" alt="OTTO Logo" />}
+        {!collapsed && <span className="sidebar-brand">Otto Shoes</span>}
+        <button className="sidebar-toggle" onClick={onToggle} aria-label="Toggle sidebar" style={collapsed ? { margin: 0 } : undefined}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {collapsed ? (
               <polyline points="9 18 15 12 9 6" />

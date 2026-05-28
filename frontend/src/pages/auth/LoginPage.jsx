@@ -88,24 +88,7 @@ export const LoginPage = () => {
     }
   }, []);
 
-  const [debugLogs, setDebugLogs] = useState([]);
 
-  useEffect(() => {
-    const updateLogs = () => {
-      try {
-        const stored = localStorage.getItem("debug_logs");
-        if (stored) {
-          setDebugLogs(JSON.parse(stored));
-        } else {
-          setDebugLogs([]);
-        }
-      } catch (e) { }
-    };
-
-    updateLogs();
-    window.addEventListener("debug_logs_updated", updateLogs);
-    return () => window.removeEventListener("debug_logs_updated", updateLogs);
-  }, []);
 
   return (
     <div className="auth-container">
@@ -236,61 +219,7 @@ export const LoginPage = () => {
             </button>
           </form>
 
-          {/* Live Debug Logs Console */}
-          <div style={{
-            marginTop: '25px',
-            padding: '12px',
-            background: '#121214',
-            border: '1px solid #333',
-            color: '#a9b1d6',
-            fontFamily: 'Consolas, monospace',
-            fontSize: '11px',
-            borderRadius: '6px',
-            textAlign: 'left',
-            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)'
-          }}>
-            <div style={{
-              fontWeight: 'bold',
-              color: '#7aa2f7',
-              borderBottom: '1px solid #2f343f',
-              paddingBottom: '6px',
-              marginBottom: '6px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span>⚙️ LIVE AUTH PROCESS TRACE:</span>
-              <button
-                type="button"
-                onClick={() => { localStorage.removeItem("debug_logs"); setDebugLogs([]); }}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #7aa2f7',
-                  color: '#7aa2f7',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '9px',
-                  padding: '2px 6px',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Clear
-              </button>
-            </div>
-            <div style={{ maxHeight: '120px', overflowY: 'auto', lineHeight: '1.5' }}>
-              {debugLogs.length === 0 ? (
-                <div style={{ color: '#565f89', fontStyle: 'italic' }}>No logs recorded yet. Try clicking "Sign In".</div>
-              ) : (
-                debugLogs.map((log, index) => {
-                  let logColor = '#a9b1d6';
-                  if (log.includes('[ERROR]')) logColor = '#f7768e';
-                  if (log.includes('[WARN]')) logColor = '#e0af68';
-                  if (log.includes('resolved') || log.includes('succeeded') || log.includes('redirecting')) logColor = '#9ece6a';
-                  return <div key={index} style={{ color: logColor }}>{log}</div>;
-                })
-              )}
-            </div>
-          </div>
+
 
           {/* Footer Branding */}
           <div className="auth-system-footer">
