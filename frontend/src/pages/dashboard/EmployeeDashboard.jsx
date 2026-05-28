@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import Sidebar from "../../components/dashboard/Sidebar";
 import InventoryView from "./views/InventoryView";
-import ScrapView from "./views/ScrapView";
 import SupplierView from "./views/SupplierView";
-import DeliveryView from "./views/DeliveryView";
 import api from "../../lib/api";
 import "../../styles/dashboard.css";
 
@@ -108,28 +106,12 @@ const getSKU = (material) => {
   return `${p1}-${p2}-${idNum}`;
 };
 
-const DEFAULT_TASKS = [
-  { id: 1, text: "Receive Cowhide delivery - Batch #2410", completed: false },
-  { id: 2, text: "Record scrap from cutting station B", completed: true },
-  { id: 3, text: "Update stock count for Goatskin Brown", completed: false },
-  { id: 4, text: "Confirm outbound delivery #DO-8812", completed: false },
-  { id: 5, text: "Print inventory report for Supervisor", completed: true },
-];
+
 
 /* ── Dynamic Home View for Clerk ───────────────── */
 const EmployeeHomeView = () => {
   const [materials, setMaterials] = useState([]);
-  const [deliveries, setDeliveries] = useState([]);
-  const [scraps, setScraps] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem("clerk_tasks");
-    return saved ? JSON.parse(saved) : DEFAULT_TASKS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("clerk_tasks", JSON.stringify(tasks));
-  }, [tasks]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -138,14 +120,6 @@ const EmployeeHomeView = () => {
         const resMat = await api.get("/inventory/materials/");
         const rawMaterials = resMat.data.results || resMat.data;
         setMaterials(rawMaterials);
-
-        // Fetch deliveries
-        const resDeliv = await api.get("/inventory/deliveries/");
-        setDeliveries(resDeliv.data.results || resDeliv.data);
-
-        // Fetch scraps
-        const resScrap = await api.get("/inventory/scrap/");
-        setScraps(resScrap.data.results || resScrap.data);
 
         // Fetch recent logs
         const resLogs = await api.get("/inventory/logs/");
@@ -161,22 +135,8 @@ const EmployeeHomeView = () => {
   const rawMaterialsTotal = materials.reduce((sum, m) => sum + m.quantity, 0);
   const lowStockItems = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
   const lowStockCount = lowStockItems.length;
-  const pendingDeliveriesCount = deliveries.filter(d => d.status === "pending").length;
 
-  // Scrap recorded today
-  const scrapTodayWeight = scraps.reduce((sum, s) => {
-    const sDate = new Date(s.recorded_date).toDateString();
-    const today = new Date().toDateString();
-    if (sDate === today) {
-      return sum + Number(s.weight_kg);
-    }
-    return sum;
-  }, 0);
 
-  // Toggle tasks
-  const handleToggleTask = (id) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
 
   return (
     <>
@@ -223,20 +183,6 @@ const EmployeeHomeView = () => {
 
         <div className="stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-label">Pending Deliveries</span>
-            <div className="stat-card-icon" style={{ color: "#2563EB", backgroundColor: "#DBEAFE" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
-              </svg>
-            </div>
-          </div>
-          <div className="stat-card-value">{pendingDeliveriesCount}</div>
-          <div className="stat-card-sub">Awaiting receipt</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-card-header">
             <span className="stat-card-label">Scrap Today</span>
             <div className="stat-card-icon" style={{ color: "#059669", backgroundColor: "#D1FAE5" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -245,65 +191,42 @@ const EmployeeHomeView = () => {
               </svg>
             </div>
           </div>
-          <div className="stat-card-value">{scrapTodayWeight > 0 ? `${scrapTodayWeight.toFixed(1)} kg` : "4.2 kg"}</div>
-          <div className="stat-card-sub">Recorded from floor</div>
+          <div className="stat-card-value" style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: "500" }}>—</div>
+          <div className="stat-card-sub">Waiting for integration</div>
         </div>
       </div>
 
-      {/* Grid: Tasks and Low Stock Items */}
-      <div className="clerk-home-grid">
-        {/* Today's Tasks */}
-        <div className="dashboard-card">
-          <h3 className="dashboard-card-title">Today's Tasks</h3>
-          <div className="task-list">
-            {tasks.map((task) => (
-              <div key={task.id} className="task-item" onClick={() => handleToggleTask(task.id)}>
-                <input
-                  type="checkbox"
-                  className="task-checkbox"
-                  checked={task.completed}
-                  onChange={() => {}} // Handled by container
-                />
-                <span className={`task-text ${task.completed ? "completed" : ""}`}>
-                  {task.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Low Stock Items Table */}
-        <div className="dashboard-card">
-          <h3 className="dashboard-card-title">Low Stock Items</h3>
-          {lowStockItems.length === 0 ? (
-            <div className="view-empty" style={{ padding: "1.5rem" }}>All materials in stock!</div>
-          ) : (
-            <div className="table-wrapper" style={{ border: "none", boxShadow: "none" }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>SKU</th>
-                    <th>Stock</th>
-                    <th>Min</th>
+      {/* Low Stock Items Table */}
+      <div className="dashboard-card" style={{ marginBottom: "1.5rem", maxHeight: "320px", display: "flex", flexDirection: "column" }}>
+        <h3 className="dashboard-card-title" style={{ flexShrink: 0 }}>Low Stock Items</h3>
+        {lowStockItems.length === 0 ? (
+          <div className="view-empty" style={{ padding: "1.5rem" }}>All materials in stock!</div>
+        ) : (
+          <div className="table-wrapper" style={{ border: "none", boxShadow: "none", overflowY: "auto", flex: 1 }}>
+            <table className="data-table">
+              <thead style={{ position: "sticky", top: 0, background: "#FAFAFA", zIndex: 1 }}>
+                <tr>
+                  <th>Item</th>
+                  <th>SKU</th>
+                  <th>Stock</th>
+                  <th>Min</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lowStockItems.map((item) => (
+                  <tr key={item.id}>
+                    <td style={{ fontSize: "0.8rem", fontWeight: "600" }}>{item.material_name || item.name}</td>
+                    <td style={{ fontSize: "0.8rem" }}>{getSKU(item)}</td>
+                    <td style={{ color: "var(--text-red)", fontWeight: "700" }}>
+                      {item.quantity}
+                    </td>
+                    <td>{item.min_stock || item.reorder_level}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lowStockItems.map((item) => (
-                    <tr key={item.id}>
-                      <td style={{ fontSize: "0.8rem", fontWeight: "600" }}>{item.material_name || item.name}</td>
-                      <td style={{ fontSize: "0.8rem" }}>{getSKU(item)}</td>
-                      <td style={{ color: "var(--text-red)", fontWeight: "700" }}>
-                        {item.quantity}
-                      </td>
-                      <td>{item.min_stock || item.reorder_level}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Recent Activity Feed */}
@@ -347,11 +270,20 @@ export const EmployeeDashboard = () => {
       case "inventory":
         return <InventoryView />;
       case "scrap":
-        return <ScrapView />;
+        return (
+          <div className="view-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            <h2 style={{ fontSize: "1.75rem", fontWeight: "800", color: "var(--text-dark)", fontFamily: "var(--font-heading)" }}>Scrap Management</h2>
+            <p style={{ fontSize: "1.1rem", color: "var(--text-muted)", maxWidth: "480px", lineHeight: 1.6 }}>
+              Waiting for sales subsystem integration
+            </p>
+          </div>
+        );
       case "supplier":
         return <SupplierView />;
-      case "delivery":
-        return <DeliveryView />;
       default:
         return <EmployeeHomeView />;
     }

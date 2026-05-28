@@ -704,6 +704,12 @@
   color: var(--primary);
 }
 
+.btn-icon-danger:hover {
+  background: #FEE2E2;
+  color: #DC2626 !important;
+}
+
+
 /* ═══════════════════════════════════════════════
    Modal
    ═══════════════════════════════════════════════ */
@@ -724,7 +730,7 @@
   background: #fff;
   border-radius: 12px;
   width: 100%;
-  max-width: 520px;
+  max-width: 640px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);

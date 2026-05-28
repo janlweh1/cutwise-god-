@@ -30,18 +30,11 @@ class Supplier(models.Model):
 class Material(models.Model):
     """Raw material tracked in the inventory."""
 
-    class MaterialType(models.TextChoices):
-        COWHIDE = "cowhide", "Cowhide"
-        GOATSKIN = "goatskin", "Goatskin"
-        SHEEPSKIN = "sheepskin", "Sheepskin"
-        SUEDE = "suede", "Suede"
-        NAPPA = "nappa", "Nappa Leather"
-        SYNTHETIC = "synthetic", "Synthetic Leather"
-        RUBBER = "rubber", "Rubber"
-        THREAD = "thread", "Thread"
-        ADHESIVE = "adhesive", "Adhesive"
-        ACCESSORY = "accessory", "Accessory"
-        OTHER = "other", "Other"
+    # Preset type slugs — used for frontend dropdown mapping
+    PRESET_TYPES = [
+        "cowhide", "goatskin", "sheepskin", "suede", "nappa",
+        "synthetic", "rubber", "thread", "adhesive", "accessory", "other",
+    ]
 
     class StockStatus(models.TextChoices):
         IN_STOCK = "in_stock", "In Stock"
@@ -66,9 +59,9 @@ class Material(models.Model):
     )
     material_name = models.CharField(max_length=255)
     material_type = models.CharField(
-        max_length=20,
-        choices=MaterialType.choices,
-        default=MaterialType.OTHER,
+        max_length=100,
+        default="other",
+        help_text="Material type. Use a preset value or a custom label.",
     )
     size = models.CharField(
         max_length=100, blank=True, default="",
@@ -92,7 +85,7 @@ class Material(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.material_name} ({self.get_material_type_display()})"
+        return f"{self.material_name} ({self.material_type})"
 
     @property
     def stock_status(self):
@@ -105,6 +98,7 @@ class Material(models.Model):
     @property
     def total_value(self):
         return self.quantity * self.unit_cost
+
 
 
 # ──────────────────────────────────────────────

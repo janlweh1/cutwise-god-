@@ -8,7 +8,7 @@ export const HeroPanel = () => {
     >
       <div className="auth-hero-overlay"></div>
       <div className="auth-hero-content">
-        <h1 className="auth-hero-title">Crafting Excellence<br />Since 1989</h1>
+        <h1 className="auth-hero-title">Crafting Excellence<br />Since 1979</h1>
         <p className="auth-hero-text">
           Premium handcrafted footwear made with the finest materials.
         </p>
