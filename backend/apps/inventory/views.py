@@ -2,14 +2,13 @@ from django.utils import timezone
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Supplier, Material, Scrap, ScrapSale, AuditLog, Delivery
+from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 from .serializers import (
     SupplierSerializer,
     MaterialSerializer,
     ScrapSerializer,
     ScrapSaleSerializer,
     AuditLogSerializer,
-    DeliverySerializer,
 )
 
 
@@ -167,75 +166,6 @@ class ScrapSaleViewSet(viewsets.ModelViewSet):
 # ──────────────────────────────────────────────
 # Audit Log (read-only)
 # ──────────────────────────────────────────────
-
-class DeliveryViewSet(viewsets.ModelViewSet):
-    """CRUD operations for incoming deliveries."""
-
-    queryset = Delivery.objects.select_related("supplier", "received_by").all()
-    serializer_class = DeliverySerializer
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["batch_number", "material_name"]
-    ordering_fields = ["created_at", "received_at"]
-
-    @action(detail=True, methods=["post"])
-    def receive(self, request, pk=None):
-        delivery = self.get_object()
-        if delivery.status == Delivery.DeliveryStatus.RECEIVED:
-            return Response(
-                {"detail": "This delivery has already been received."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Update delivery status
-        delivery.status = Delivery.DeliveryStatus.RECEIVED
-        delivery.received_at = timezone.now()
-        delivery.received_by = request.user
-        delivery.save()
-
-        # Increment/Create Raw Material stock in inventory
-        material_type = Material.MaterialType.OTHER
-        name_lower = delivery.material_name.lower()
-        for choice_val, choice_lbl in Material.MaterialType.choices:
-            if choice_val in name_lower or choice_lbl.lower() in name_lower:
-                material_type = choice_val
-                break
-
-        material, created = Material.objects.get_or_create(
-            material_name=delivery.material_name,
-            supplier=delivery.supplier,
-            material_type=material_type,
-            defaults={
-                "size": delivery.size,
-                "quantity": delivery.quantity,
-                "added_by": request.user,
-            }
-        )
-
-        if not created:
-            material.quantity += delivery.quantity
-            if delivery.size and not material.size:
-                material.size = delivery.size
-            material.added_by = request.user
-            material.save()
-
-        # Log the action in AuditLog
-        log_action(
-            request.user,
-            AuditLog.ActionType.DELIVERY_RECEIVED,
-            f"Received delivery: {delivery.material_name} — Qty: {delivery.quantity} (Batch: {delivery.batch_number})",
-        )
-
-        # Also log a material updated / added action in AuditLog to sync with standard material audits
-        action_type = AuditLog.ActionType.MATERIAL_ADDED if created else AuditLog.ActionType.MATERIAL_UPDATED
-        details_str = f"Added material: {material.material_name} ({material.get_material_type_display()}) — Qty: {material.quantity} (via delivery receipt)" if created else f"Updated material: {material.material_name} ({material.get_material_type_display()}) — Qty: {material.quantity} (via delivery receipt)"
-        log_action(
-            request.user,
-            action_type,
-            details_str,
-        )
-
-        serializer = self.get_serializer(delivery)
-        return Response(serializer.data)
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

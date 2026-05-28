@@ -36,6 +36,19 @@ class Material(models.Model):
         "synthetic", "rubber", "thread", "adhesive", "accessory", "other",
     ]
 
+    class MaterialType:
+        COWHIDE = "cowhide"
+        GOATSKIN = "goatskin"
+        SHEEPSKIN = "sheepskin"
+        SUEDE = "suede"
+        NAPPA = "nappa"
+        SYNTHETIC = "synthetic"
+        RUBBER = "rubber"
+        THREAD = "thread"
+        ADHESIVE = "adhesive"
+        ACCESSORY = "accessory"
+        OTHER = "other"
+
     class StockStatus(models.TextChoices):
         IN_STOCK = "in_stock", "In Stock"
         LOW_STOCK = "low_stock", "Low Stock"
@@ -84,8 +97,24 @@ class Material(models.Model):
             )
         ]
 
+    def get_material_type_display(self):
+        mapping = {
+            "cowhide": "Cowhide",
+            "goatskin": "Goatskin",
+            "sheepskin": "Sheepskin",
+            "suede": "Suede",
+            "nappa": "Nappa Leather",
+            "synthetic": "Synthetic Leather",
+            "rubber": "Rubber",
+            "thread": "Thread",
+            "adhesive": "Adhesive",
+            "accessory": "Accessory",
+            "other": "Other",
+        }
+        return mapping.get(self.material_type, self.material_type.title())
+
     def __str__(self):
-        return f"{self.material_name} ({self.material_type})"
+        return f"{self.material_name} ({self.get_material_type_display()})"
 
     @property
     def stock_status(self):
@@ -174,50 +203,6 @@ class ScrapSale(models.Model):
         return f"Sale of {self.scrap} — ₱{self.total_amount}"
 
 
-# ──────────────────────────────────────────────
-# Delivery
-# ──────────────────────────────────────────────
-
-class Delivery(models.Model):
-    """Incoming delivery/shipment of raw materials."""
-
-    class DeliveryStatus(models.TextChoices):
-        PENDING = "pending", "Pending"
-        RECEIVED = "received", "Received"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    batch_number = models.CharField(max_length=100, unique=True)
-    material_name = models.CharField(max_length=255)
-    quantity = models.PositiveIntegerField(default=0)
-    size = models.CharField(max_length=100, blank=True, default="")
-    supplier = models.ForeignKey(
-        Supplier,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="deliveries",
-    )
-    status = models.CharField(
-        max_length=15,
-        choices=DeliveryStatus.choices,
-        default=DeliveryStatus.PENDING,
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    received_at = models.DateTimeField(null=True, blank=True)
-    received_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="deliveries_received",
-    )
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.batch_number} — {self.material_name} ({self.status})"
-
 
 # ──────────────────────────────────────────────
 # Audit Log
@@ -234,7 +219,6 @@ class AuditLog(models.Model):
         SCRAP_SOLD = "scrap_sold", "Scrap Sold"
         STOCK_ADJUSTED = "stock_adjusted", "Stock Adjusted"
         SUPPLIER_ADDED = "supplier_added", "Supplier Added"
-        DELIVERY_RECEIVED = "delivery_received", "Delivery Received"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(

@@ -45,12 +45,7 @@ const recentActivity = [
     desc: "Nappa Leather below threshold (22 remaining)",
     time: "5 hours ago",
   },
-  {
-    type: "delivery",
-    title: "Delivery Received",
-    desc: "120 sqft Cowhide from Manila Leather Supply",
-    time: "Yesterday",
-  },
+
   {
     type: "success",
     title: "Inventory Updated",
@@ -87,12 +82,7 @@ const ActivityIcon = ({ type }) => {
         <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     ),
-    delivery: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-        <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
-      </svg>
-    ),
+
     success: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
