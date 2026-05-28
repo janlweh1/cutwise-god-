@@ -1,4 +1,4 @@
-import buildingImg from "../../assets/otto-building.png";
+import buildingImg from "../../assets/ottodrone.jpg";
 
 export const HeroPanel = () => {
   return (

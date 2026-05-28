@@ -28,13 +28,6 @@ export const RoleSelectPage = () => {
           <h2 className="auth-title">Welcome back!</h2>
           <p className="auth-subtitle">Please select your account type to continue.</p>
 
-          {/* Developer Assistance Helper */}
-          <div className="auth-dev-banner">
-            <strong>Testing Credentials:</strong><br />
-            • Inventory Clerk: <code>clerk@otto.com</code> / <code>password123</code><br />
-            • Supervisor: <code>supervisor@otto.com</code> / <code>password123</code><br />
-            • Admin: <code>admin@otto.com</code> / <code>password123</code>
-          </div>
 
           {/* Role Selection Buttons */}
           <button 
