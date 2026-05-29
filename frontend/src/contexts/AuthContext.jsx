@@ -89,9 +89,10 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (email, password) => {
     logRemote(`signIn started for email: ${email}`, "info");
 
+    // Quick client-side check (UX optimization — server enforces the real lockout)
     const lockoutStatus = checkLockout(email);
     if (lockoutStatus.isLocked) {
-      logRemote(`signIn aborted: account locked for ${email}`, "warn");
+      logRemote(`signIn aborted: client-side lockout for ${email}`, "warn");
       throw new Error(
         `This account is temporarily locked. Please try again in ${lockoutStatus.remainingMinutes} minutes.`
       );
@@ -116,15 +117,22 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       logRemote(`signIn failed: ${err.response?.data?.detail || err.message}`, "error");
 
+      // Use server-provided error message if available
+      const serverDetail = err.response?.data?.detail;
+      const httpStatus = err.response?.status;
+
+      // Track client-side failures (belt-and-suspenders with server)
       const failureStatus = registerFailure(email);
-      if (failureStatus.isLocked) {
+
+      if (httpStatus === 403 || failureStatus.isLocked) {
+        // Account locked (server or client side)
         throw new Error(
-          "Too many failed login attempts. Your account has been locked for 15 minutes."
+          serverDetail || "Too many failed login attempts. Your account has been locked for 15 minutes."
         );
       } else {
-        const remaining = LOCKOUT_ATTEMPTS - failureStatus.count;
+        // Regular auth failure — use server message which includes remaining attempts
         throw new Error(
-          `Invalid email or password. You have ${remaining} attempts remaining before account lockout.`
+          serverDetail || "Invalid email or password."
         );
       }
     }

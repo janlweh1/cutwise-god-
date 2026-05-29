@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer, UserSerializer
 from .jwt_serializers import CustomTokenObtainPairSerializer
+from .models import UserProfile
 
 
 class RegisterView(generics.CreateAPIView):
@@ -21,9 +22,78 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     Extends the standard simplejwt view to use our custom serializer
     which embeds role and full_name in both the JWT and the response body.
+
+    Also enforces server-side account lockout after 5 failed login attempts.
     """
 
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        username = request.data.get("username", "").strip()
+
+        # ── Pre-auth: check if account is locked ──────────────────────
+        profile = None
+        try:
+            user_obj = User.objects.get(username=username)
+            profile = getattr(user_obj, "profile", None)
+        except User.DoesNotExist:
+            # Also try by email
+            try:
+                user_obj = User.objects.get(email=username)
+                profile = getattr(user_obj, "profile", None)
+            except User.DoesNotExist:
+                pass
+
+        if profile and profile.is_locked:
+            return Response(
+                {
+                    "detail": (
+                        f"This account is temporarily locked due to too many failed login attempts. "
+                        f"Please try again in {profile.lockout_remaining_minutes} minutes."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # ── Attempt authentication ────────────────────────────────────
+        try:
+            response = super().post(request, *args, **kwargs)
+        except Exception:
+            # Authentication failed — record the failure
+            if profile:
+                profile.register_failed_attempt()
+                remaining = max(0, UserProfile.LOCKOUT_THRESHOLD - profile.failed_login_attempts)
+                if profile.is_locked:
+                    return Response(
+                        {
+                            "detail": (
+                                "Too many failed login attempts. "
+                                f"Your account has been locked for {profile.lockout_remaining_minutes} minutes."
+                            )
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                else:
+                    return Response(
+                        {
+                            "detail": (
+                                f"Invalid email or password. "
+                                f"You have {remaining} attempt{'s' if remaining != 1 else ''} remaining before account lockout."
+                            )
+                        },
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+            # User not found — generic error (prevent user enumeration)
+            return Response(
+                {"detail": "Invalid email or password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # ── Success — reset lockout counter ───────────────────────────
+        if profile:
+            profile.reset_failed_attempts()
+
+        return response
 
 
 @api_view(["GET"])
@@ -57,3 +127,4 @@ def forgot_password(request):
         {"detail": "If an account with that email exists, a reset link has been sent."},
         status=status.HTTP_200_OK,
     )
+
