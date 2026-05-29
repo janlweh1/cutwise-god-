@@ -40,98 +40,6 @@ const formatDate = () => {
   });
 };
 
-/* ── Dynamic time elapsed formatter ─────────── */
-
-const formatTimeElapsed = (timestampStr) => {
-  const date = new Date(timestampStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / (60 * 1000));
-  const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
-  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-
-  if (diffMins < 60) {
-    return diffMins <= 0 ? "Just now" : `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
-  } else if (diffDays === 1) {
-    return "Yesterday";
-  } else {
-    return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
-  }
-};
-
-/* ── Activity Icon by Type ──────────────────── */
-
-const ActivityIcon = ({ type }) => {
-  const icons = {
-    scrap_sold: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-      </svg>
-    ),
-    scrap_recorded: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="23 4 23 10 17 10" />
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-      </svg>
-    ),
-    stock_adjusted: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-      </svg>
-    ),
-    material_added: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-    ),
-    material_updated: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-      </svg>
-    ),
-    material_deleted: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      </svg>
-    ),
-    supplier_added: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  };
-  return icons[type] || (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="16" />
-      <line x1="8" y1="12" x2="16" y2="12" />
-    </svg>
-  );
-};
-
-/* Helper to convert database action string to activity details */
-const getActivityInfo = (log) => {
-  const map = {
-    scrap_sold: { label: "Scrap Sale", className: "sale" },
-    scrap_recorded: { label: "Scrap Recorded", className: "inventory" },
-    stock_adjusted: { label: "Stock Adjusted", className: "inventory" },
-    material_added: { label: "Material Added", className: "success" },
-    material_updated: { label: "Material Updated", className: "inventory" },
-    material_deleted: { label: "Material Deleted", className: "alert" },
-    supplier_added: { label: "Supplier Added", className: "success" },
-  };
-  return map[log.action] || { label: "Activity", className: "inventory" };
-};
-
 /* ── Custom Tooltip for Pie Chart ────────────── */
 
 const CustomPieTooltip = ({ active, payload }) => {
@@ -172,20 +80,17 @@ const getSKU = (material) => {
 const SupervisorHomeView = ({ fullName }) => {
   const [materials, setMaterials] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [resMat, resSuppliers, resLogs] = await Promise.all([
+        const [resMat, resSuppliers] = await Promise.all([
           api.get("/inventory/materials/"),
           api.get("/inventory/suppliers/"),
-          api.get("/inventory/logs/"),
         ]);
         setMaterials(resMat.data.results || resMat.data);
         setSuppliers(resSuppliers.data.results || resSuppliers.data);
-        setLogs((resLogs.data.results || resLogs.data).slice(0, 5));
       } catch (err) {
         console.error("Error fetching supervisor home data:", err);
       } finally {
@@ -371,32 +276,6 @@ const SupervisorHomeView = ({ fullName }) => {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="activity-section">
-            <h3 className="activity-title">Recent Activity</h3>
-            {logs.length === 0 ? (
-              <div className="view-empty">No recent activity logs.</div>
-            ) : (
-              <div className="activity-list">
-                {logs.map((log) => {
-                  const actInfo = getActivityInfo(log);
-                  return (
-                    <div key={log.id} className="activity-item">
-                      <div className={`activity-icon ${actInfo.className}`}>
-                        <ActivityIcon type={log.action} />
-                      </div>
-                      <div className="activity-content">
-                        <div className="activity-content-title">{actInfo.label}</div>
-                        <div className="activity-content-desc">{log.details}</div>
-                      </div>
-                      <div className="activity-time">{formatTimeElapsed(log.timestamp)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </>
       )}
