@@ -15,6 +15,7 @@ class Supplier(models.Model):
     contact_person = models.CharField(max_length=255, blank=True, default="")
     phone = models.CharField(max_length=50, blank=True, default="")
     email = models.EmailField(blank=True, default="")
+    address = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["name"]
@@ -219,6 +220,7 @@ class AuditLog(models.Model):
         SCRAP_SOLD = "scrap_sold", "Scrap Sold"
         STOCK_ADJUSTED = "stock_adjusted", "Stock Adjusted"
         SUPPLIER_ADDED = "supplier_added", "Supplier Added"
+        CONFIG_UPDATED = "config_updated", "Configuration Updated"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(

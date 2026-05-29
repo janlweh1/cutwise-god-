@@ -58,11 +58,17 @@ class TestSupplierEndpoints:
         payload = {
             "name": "Supplier C",
             "contact_person": "Charles",
-            "email": "charles@supplierc.com"
+            "email": "charles@supplierc.com",
+            "address": "123 Leather Street, Manila"
         }
         response = authenticated_client.post(url, payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["name"] == "Supplier C"
+        assert response.data["address"] == "123 Leather Street, Manila"
+
+        # Verify in database
+        supp = Supplier.objects.get(name="Supplier C")
+        assert supp.address == "123 Leather Street, Manila"
         
         # Verify supplier_added audit log is created
         assert AuditLog.objects.filter(
@@ -237,16 +243,63 @@ class TestScrapEndpoints:
 
 @pytest.mark.django_db
 class TestAuditLogEndpoints:
-    def test_audit_logs_read_only(self, authenticated_client):
+    @pytest.fixture
+    def admin_client(self, api_client):
+        admin = User.objects.create(
+            username="admin@otto.com",
+            email="admin@otto.com"
+        )
+        profile = admin.profile
+        profile.role = UserProfile.Role.ADMIN
+        profile.full_name = "System Admin"
+        profile.save()
+        token = RefreshToken.for_user(admin)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return api_client
+
+    def test_audit_logs_read_only_for_admin(self, admin_client):
         AuditLog.objects.create(action="supplier_added", username="System", details="Action details")
         url = reverse("inventory:audit-log-list")
         
-        # GET should succeed
-        response = authenticated_client.get(url)
+        # GET should succeed for admin
+        response = admin_client.get(url)
         assert response.status_code == status.HTTP_200_OK
         results = response.data.get("results", response.data)
         assert len(results) == 1
         
         # POST/PUT should be disallowed (read-only viewset)
-        response = authenticated_client.post(url, {"username": "FakeUser"})
+        response = admin_client.post(url, {"username": "FakeUser"})
         assert response.status_code in [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_403_FORBIDDEN]
+
+    def test_audit_logs_forbidden_for_clerk(self, authenticated_client):
+        url = reverse("inventory:audit-log-list")
+        
+        # GET should fail with 403 Forbidden for a clerk
+        response = authenticated_client.get(url)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_audit_logs_filtering(self, admin_client):
+        # Create different audit logs
+        AuditLog.objects.create(action="material_added", username="John Clerk", details="Added Full Grain")
+        AuditLog.objects.create(action="material_deleted", username="Alice Admin", details="Deleted scrap")
+        
+        url = reverse("inventory:audit-log-list")
+        
+        # Filter by username
+        res = admin_client.get(url, {"username": "John Clerk"})
+        results = res.data.get("results", res.data)
+        assert len(results) == 1
+        assert results[0]["username"] == "John Clerk"
+
+        # Filter by action
+        res = admin_client.get(url, {"action": "material_deleted"})
+        results = res.data.get("results", res.data)
+        assert len(results) == 1
+        assert results[0]["action"] == "material_deleted"
+
+        # Filter by date
+        from django.utils import timezone
+        today_str = timezone.now().strftime("%Y-%m-%d")
+        res = admin_client.get(url, {"date": today_str})
+        results = res.data.get("results", res.data)
+        assert len(results) == 2

@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from apps.authentication.permissions import IsAdminUserRole
 from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 from .serializers import (
     SupplierSerializer,
@@ -171,8 +172,31 @@ class ScrapSaleViewSet(viewsets.ModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only access to audit trail logs."""
 
-    queryset = AuditLog.objects.all()
     serializer_class = AuditLogSerializer
+    permission_classes = [IsAdminUserRole]
     search_fields = ["username", "action", "details"]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ["timestamp"]
+
+    def get_queryset(self):
+        queryset = AuditLog.objects.all()
+
+        # Filter by username (exact, case-insensitive)
+        username = self.request.query_params.get("username")
+        if username:
+            queryset = queryset.filter(username__iexact=username)
+
+        # Filter by action type (exact)
+        action = self.request.query_params.get("action")
+        if action:
+            queryset = queryset.filter(action=action)
+
+        # Filter by date (exact match of date part YYYY-MM-DD)
+        date_str = self.request.query_params.get("date")
+        if date_str:
+            try:
+                queryset = queryset.filter(timestamp__date=date_str)
+            except ValueError:
+                pass
+
+        return queryset

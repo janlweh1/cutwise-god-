@@ -5,7 +5,7 @@ from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
-        fields = ["id", "name", "contact_person", "phone", "email"]
+        fields = ["id", "name", "contact_person", "phone", "email", "address"]
 
 
 class MaterialSerializer(serializers.ModelSerializer):
@@ -93,7 +93,9 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
+
     class Meta:
         model = AuditLog
-        fields = ["id", "user", "username", "action", "details", "timestamp"]
+        fields = ["id", "user", "username", "action", "action_display", "details", "timestamp"]
         read_only_fields = ["id", "timestamp"]
