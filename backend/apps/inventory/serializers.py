@@ -3,9 +3,14 @@ from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 
 
 class SupplierSerializer(serializers.ModelSerializer):
+    material_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Supplier
-        fields = ["id", "name", "contact_person", "phone", "email", "address"]
+        fields = ["id", "name", "contact_person", "phone", "email", "address", "material_count"]
+
+    def get_material_count(self, obj):
+        return obj.materials.count()
 
 
 class MaterialSerializer(serializers.ModelSerializer):
