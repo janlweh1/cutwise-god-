@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from apps.authentication.permissions import IsAdminUserRole
+from apps.authentication.permissions import IsAdminOrSupervisorUserRole
 from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 from .serializers import (
     SupplierSerializer,
@@ -173,7 +173,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only access to audit trail logs."""
 
     serializer_class = AuditLogSerializer
-    permission_classes = [IsAdminUserRole]
+    permission_classes = [IsAdminOrSupervisorUserRole]
     search_fields = ["username", "action", "details"]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ["timestamp"]

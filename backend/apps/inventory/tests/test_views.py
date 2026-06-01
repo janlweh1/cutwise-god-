@@ -257,6 +257,30 @@ class TestAuditLogEndpoints:
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
         return api_client
 
+    @pytest.fixture
+    def supervisor_client(self, api_client):
+        supervisor = User.objects.create(
+            username="supervisor@otto.com",
+            email="supervisor@otto.com"
+        )
+        profile = supervisor.profile
+        profile.role = UserProfile.Role.SUPERVISOR
+        profile.full_name = "Production Supervisor"
+        profile.save()
+        token = RefreshToken.for_user(supervisor)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return api_client
+
+    def test_audit_logs_allowed_for_supervisor(self, supervisor_client):
+        AuditLog.objects.create(action="supplier_added", username="System", details="Action details")
+        url = reverse("inventory:audit-log-list")
+        
+        # GET should succeed (200 OK) for a supervisor
+        response = supervisor_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        assert len(results) == 1
+
     def test_audit_logs_read_only_for_admin(self, admin_client):
         AuditLog.objects.create(action="supplier_added", username="System", details="Action details")
         url = reverse("inventory:audit-log-list")
