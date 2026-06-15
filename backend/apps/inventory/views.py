@@ -1,7 +1,9 @@
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from apps.authentication.permissions import IsAdminOrSupervisorUserRole
 from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 from .serializers import (
@@ -62,6 +64,9 @@ class SupplierViewSet(viewsets.ModelViewSet):
 class MaterialViewSet(viewsets.ModelViewSet):
     """CRUD operations for raw materials."""
 
+    # Allow unauthenticated access for cross-subsystem integration (Tailscale network)
+    permission_classes = [AllowAny]
+
     queryset = Material.objects.select_related("supplier", "added_by").all()
     serializer_class = MaterialSerializer
     search_fields = ["material_name", "material_type"]
@@ -105,6 +110,68 @@ class MaterialViewSet(viewsets.ModelViewSet):
             f"Deleted material: {name}",
         )
         instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="deduct", permission_classes=[AllowAny])
+    def deduct(self, request, pk=None):
+        """Deduct a quantity from a material's stock. Used for cross-system integration."""
+        material = self.get_object()
+        quantity_to_deduct = request.data.get("quantity")
+
+        # --- Validation ---
+        if quantity_to_deduct is None:
+            return Response(
+                {"error": "Quantity is required to deduct stock."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            quantity_to_deduct = int(quantity_to_deduct)
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Quantity must be a valid whole number."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if quantity_to_deduct <= 0:
+            return Response(
+                {"error": "Quantity to deduct must be greater than zero."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- Atomic deduction with row-level lock ---
+        with transaction.atomic():
+            # select_for_update() locks the row until the transaction completes,
+            # preventing race conditions from concurrent deduction requests.
+            material = Material.objects.select_for_update().get(pk=material.pk)
+
+            if material.quantity < quantity_to_deduct:
+                return Response(
+                    {
+                        "error": f"Insufficient stock. Current stock: {material.quantity}",
+                        "current_quantity": material.quantity,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            material.quantity -= quantity_to_deduct
+            material.save(update_fields=["quantity"])
+
+            log_action(
+                request.user,
+                AuditLog.ActionType.STOCK_ADJUSTED,
+                f"Stock deducted: {material.material_name} — Deducted: {quantity_to_deduct} — Remaining: {material.quantity}",
+            )
+
+        return Response(
+            {
+                "status": "success",
+                "message": f"Successfully deducted {quantity_to_deduct} from stock.",
+                "material_id": material.pk,
+                "material_name": material.material_name,
+                "new_quantity": material.quantity,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # ──────────────────────────────────────────────

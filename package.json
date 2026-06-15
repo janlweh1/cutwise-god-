@@ -1,0 +1,23 @@
+{
+  "name": "cutwise-ims",
+  "version": "1.0.0",
+  "description": "<p align=\"center\">   <h1 align=\"center\">CutWise IMS</h1>   <p align=\"center\">     <strong>Intelligent Inventory Management System</strong><br/>     Built with React, Django, and PostgreSQL   </p> </p>",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/janlweh1/cutwise-god-.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/janlweh1/cutwise-god-/issues"
+  },
+  "homepage": "https://github.com/janlweh1/cutwise-god-#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.3"
+  }
+}
