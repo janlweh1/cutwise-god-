@@ -101,6 +101,15 @@ class MaterialViewSet(viewsets.ModelViewSet):
         elif stock_status == "in_stock":
             from django.db import models as db_models
             qs = qs.filter(quantity__gt=db_models.F("min_stock"))
+
+        # Date range filtering for report generation (based on last_update)
+        date_from = self.request.query_params.get("date_from")
+        date_to   = self.request.query_params.get("date_to")
+        if date_from:
+            qs = qs.filter(last_update__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(last_update__date__lte=date_to)
+
         return qs
 
     def perform_create(self, serializer):
