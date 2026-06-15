@@ -375,16 +375,23 @@ export const ReportsView = () => {
   const [dateFilter, setDateFilter]   = useState("");
   const [allUsers, setAllUsers]       = useState([]);
   const [generating, setGenerating]   = useState(false);
+  const [page, setPage]               = useState(1);
+  const [totalCount, setTotalCount]   = useState(0);
 
   // Report data — fetched lazily when generating
   const [reportData, setReportData]   = useState(null);
   const chartRef = useRef(null);
 
+  /* ── Reset page on filter changes ── */
+  useEffect(() => {
+    setPage(1);
+  }, [search, userFilter, actionFilter, dateFilter]);
+
   /* ── Fetch audit log users for dropdown ── */
   useEffect(() => {
     const fetchUsersList = async () => {
       try {
-        const res = await api.get("/inventory/logs/");
+        const res = await api.get("/inventory/logs/", { params: { page_size: 100 } });
         const data = res.data.results || res.data;
         const users = [...new Set(data.map((log) => log.username).filter(Boolean))];
         setAllUsers(users);
@@ -399,19 +406,25 @@ export const ReportsView = () => {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page };
       if (search)       params.search   = search;
       if (userFilter)   params.username = userFilter;
       if (actionFilter) params.action   = actionFilter;
       if (dateFilter)   params.date     = dateFilter;
       const res = await api.get("/inventory/logs/", { params });
-      setLogs(res.data.results || res.data);
+      if (res.data.results) {
+        setLogs(res.data.results);
+        setTotalCount(res.data.count || 0);
+      } else {
+        setLogs(res.data);
+        setTotalCount(res.data.length || 0);
+      }
     } catch (err) {
       console.error("Failed to fetch audit logs:", err);
     } finally {
       setLoading(false);
     }
-  }, [search, userFilter, actionFilter, dateFilter]);
+  }, [page, search, userFilter, actionFilter, dateFilter]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
@@ -553,43 +566,78 @@ export const ReportsView = () => {
       ) : logs.length === 0 ? (
         <div className="view-empty">No audit records found.</div>
       ) : (
-        <div className="table-wrapper">
-          <table className="data-table" id="audit-log-table">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="td-muted">
-                    {new Date(log.timestamp).toLocaleString("en-PH", {
-                      year: "numeric", month: "short", day: "numeric",
-                      hour: "2-digit", minute: "2-digit",
-                    })}
-                  </td>
-                  <td className="td-bold">{log.username || "System"}</td>
-                  <td>
-                    <span
-                      className="action-badge"
-                      style={{
-                        backgroundColor: ACTION_COLORS[log.action] || "#6B7280",
-                        color: "#fff",
-                      }}
-                    >
-                      {log.action_display || log.action}
-                    </span>
-                  </td>
-                  <td>{log.details || "—"}</td>
+        <>
+          <div className="table-wrapper">
+            <table className="data-table" id="audit-log-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id}>
+                    <td className="td-muted">
+                      {new Date(log.timestamp).toLocaleString("en-PH", {
+                        year: "numeric", month: "short", day: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="td-bold">{log.username || "System"}</td>
+                    <td>
+                      <span
+                        className="action-badge"
+                        style={{
+                          backgroundColor: ACTION_COLORS[log.action] || "#6B7280",
+                          color: "#fff",
+                        }}
+                      >
+                        {log.action_display || log.action}
+                      </span>
+                    </td>
+                    <td>{log.details || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="pagination-controls" style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "1rem",
+            padding: "0.75rem 1rem",
+            background: "#fff",
+            border: "1px solid var(--border-color)",
+            borderRadius: "8px",
+            boxShadow: "var(--shadow-sm)",
+          }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{ padding: "0.4rem 1rem", fontSize: "0.85rem", cursor: page === 1 ? "not-allowed" : "pointer" }}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-muted)" }}>
+              Page {page} of {Math.ceil(totalCount / 30) || 1}
+            </span>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page * 30 >= totalCount}
+              style={{ padding: "0.4rem 1rem", fontSize: "0.85rem", cursor: page * 30 >= totalCount ? "not-allowed" : "pointer" }}
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
 
       {/* ── Hidden chart used for PDF snapshot ── */}

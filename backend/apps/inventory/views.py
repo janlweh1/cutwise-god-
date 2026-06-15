@@ -252,11 +252,19 @@ class ScrapSaleViewSet(viewsets.ModelViewSet):
 # Audit Log (read-only)
 # ──────────────────────────────────────────────
 
+from rest_framework.pagination import PageNumberPagination
+
+class AuditLogPagination(PageNumberPagination):
+    page_size = 30
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only access to audit trail logs."""
 
     serializer_class = AuditLogSerializer
+    pagination_class = AuditLogPagination
     permission_classes = [IsAdminOrSupervisorUserRole]
     search_fields = ["username", "action", "details"]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
