@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 /* ── Constants ───────────────────────────────── */
 
@@ -38,9 +39,105 @@ const fmt = (n, dec = 2) =>
     maximumFractionDigits: dec,
   });
 
+/* ── Excel Report Generator ──────────────────── */
+
+const generateExcel = ({ materials, suppliers, scraps, dateFrom, dateTo }) => {
+  const wb = XLSX.utils.book_new();
+
+  const rangeLabel = dateFrom || dateTo
+    ? `${dateFrom || "All"} to ${dateTo || "All"}`
+    : "All Dates";
+
+  const MATERIAL_TYPE_LABELS_LOCAL = {
+    cowhide: "Cowhide", goatskin: "Goatskin", sheepskin: "Sheepskin",
+    suede: "Suede", nappa: "Nappa Leather", synthetic: "Synthetic Leather",
+    rubber: "Rubber", thread: "Thread", adhesive: "Adhesive",
+    accessory: "Accessory", other: "Other",
+  };
+
+  /* Sheet 1 – Raw Materials (all) */
+  const matData = [
+    ["CUTWISE INVENTORY MANAGEMENT — RAW MATERIALS"],
+    [`Date Range: ${rangeLabel}`],
+    [],
+    ["Material Name", "Type", "Supplier", "Qty", "Unit Cost (₱)", "Total Value (₱)", "Min Stock", "Stock Status"],
+    ...materials.map(m => [
+      m.material_name,
+      MATERIAL_TYPE_LABELS_LOCAL[m.material_type] || m.material_type,
+      m.supplier_name || "—",
+      m.quantity,
+      Number(m.unit_cost || 0),
+      Number(m.total_value || 0),
+      m.min_stock,
+      m.stock_status === "in_stock" ? "In Stock"
+        : m.stock_status === "low_stock" ? "Low Stock"
+        : "Out of Stock",
+    ]),
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(matData);
+  ws1["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws1, "Raw Materials");
+
+  /* Sheet 2 – Low Stock Items */
+  const lowStock = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
+  const lowData = [
+    ["LOW STOCK MATERIALS — NEEDS RESTOCKING"],
+    [],
+    ["Material Name", "Type", "Current Stock", "Min Stock", "Unit Cost (₱)", "Status"],
+    ...lowStock.map(m => [
+      m.material_name,
+      MATERIAL_TYPE_LABELS_LOCAL[m.material_type] || m.material_type,
+      m.quantity,
+      m.min_stock,
+      Number(m.unit_cost || 0),
+      m.stock_status === "out_of_stock" ? "OUT OF STOCK" : "LOW STOCK",
+    ]),
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(lowData);
+  ws2["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws2, "Low Stock");
+
+  /* Sheet 3 – Scrap Summary */
+  const scrapData = [
+    ["SCRAP INVENTORY SUMMARY"],
+    [],
+    ["Source Material", "Weight (kg)", "Date Recorded", "Status"],
+    ...scraps.map(s => [
+      s.material_name,
+      Number(s.weight_kg),
+      new Date(s.recorded_date).toLocaleDateString("en-PH"),
+      s.status === "available" ? "Available" : "Sold",
+    ]),
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(scrapData);
+  ws3["!cols"] = [{ wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws3, "Scrap Summary");
+
+  /* Sheet 4 – Suppliers */
+  const supplierData = [
+    ["ACTIVE SUPPLIERS"],
+    [],
+    ["Supplier Name", "Contact Person", "Phone", "Email", "Materials"],
+    ...suppliers.map(s => [
+      s.name,
+      s.contact_person || "—",
+      s.phone || "—",
+      s.email || "—",
+      s.material_count || 0,
+    ]),
+  ];
+  const ws4 = XLSX.utils.aoa_to_sheet(supplierData);
+  ws4["!cols"] = [{ wch: 28 }, { wch: 20 }, { wch: 18 }, { wch: 28 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws4, "Suppliers");
+
+  const now = new Date();
+  const filename = `CUTWISE_Report_${now.toISOString().slice(0, 10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+};
+
 /* ── PDF Report Generator ───────────────────── */
 
-const generatePDF = async ({ materials, suppliers, scraps, chartRef }) => {
+const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, dateTo }) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 16;
@@ -66,6 +163,15 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef }) => {
   });
   const genTime = now.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
   doc.text(`Generated: ${genDate} at ${genTime}`, pageWidth - margin, 22, { align: "right" });
+
+  /* ── Date range label ── */
+  if (dateFrom || dateTo) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8.5);
+    doc.setTextColor(230, 210, 210);
+    const rangeLabel = `Data range: ${dateFrom || "All"} → ${dateTo || "All"}`;
+    doc.text(rangeLabel, margin, 28);
+  }
 
   y = 42;
 
@@ -428,12 +534,22 @@ export const ReportsView = () => {
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
+  const [reportDate, setReportDate]         = useState("");
+  const [generatingExcel, setGeneratingExcel] = useState(false);
+
   /* ── Fetch all report data + generate PDF ── */
+  const buildReportParams = () => {
+    const p = {};
+    if (reportDate) { p.date_from = reportDate; p.date_to = reportDate; }
+    return p;
+  };
+
   const handleGenerateReport = async () => {
     setGenerating(true);
     try {
+      const params = buildReportParams();
       const [resMat, resSuppliers, resScraps] = await Promise.all([
-        api.get("/inventory/materials/"),
+        api.get("/inventory/materials/", { params }),
         api.get("/inventory/suppliers/"),
         api.get("/inventory/scrap/"),
       ]);
@@ -445,12 +561,32 @@ export const ReportsView = () => {
 
       // Wait one tick for the hidden chart to render, then generate PDF
       setTimeout(async () => {
-        await generatePDF({ materials, suppliers, scraps, chartRef });
+      await generatePDF({ materials, suppliers, scraps, chartRef, dateFrom: reportDate, dateTo: reportDate });
         setGenerating(false);
       }, 600);
     } catch (err) {
       console.error("Failed to generate report:", err);
       setGenerating(false);
+    }
+  };
+
+  const handleGenerateExcel = async () => {
+    setGeneratingExcel(true);
+    try {
+      const params = buildReportParams();
+      const [resMat, resSuppliers, resScraps] = await Promise.all([
+        api.get("/inventory/materials/", { params }),
+        api.get("/inventory/suppliers/"),
+        api.get("/inventory/scrap/"),
+      ]);
+      const materials  = resMat.data.results      || resMat.data;
+      const suppliers  = resSuppliers.data.results || resSuppliers.data;
+      const scraps     = resScraps.data.results    || resScraps.data;
+      generateExcel({ materials, suppliers, scraps, dateFrom: reportDate, dateTo: reportDate });
+    } catch (err) {
+      console.error("Failed to generate Excel:", err);
+    } finally {
+      setGeneratingExcel(false);
     }
   };
 
@@ -472,37 +608,91 @@ export const ReportsView = () => {
     <div className="view-container">
 
       {/* ── Header ── */}
-      <div className="view-header">
+      <div className="view-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
         <h2 className="view-title">Audit Trail</h2>
-        <button
-          id="generate-report-btn"
-          className="btn btn-primary"
-          onClick={handleGenerateReport}
-          disabled={generating}
-          style={{ gap: "0.5rem" }}
-        >
-          {generating ? (
-            <>
-              <svg
-                width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                style={{ animation: "spin 1s linear infinite" }}
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          {/* Report date picker */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>
+            <span>Report date:</span>
+            <input
+              type="date"
+              id="report-date"
+              className="filter-input"
+              style={{ padding: "0.35rem 0.6rem", fontSize: "0.8rem", width: "150px" }}
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
+            />
+            {reportDate && (
+              <button
+                className="btn btn-secondary"
+                style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem" }}
+                onClick={() => setReportDate("")}
+                title="Clear date filter"
               >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-              Generating…
-            </>
-          ) : (
-            <>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Download Report (PDF)
-            </>
-          )}
-        </button>
+                ✕
+              </button>
+            )}
+          </div>
+          <button
+            id="generate-report-btn"
+            className="btn btn-primary"
+            onClick={handleGenerateReport}
+            disabled={generating || generatingExcel}
+            style={{ gap: "0.5rem" }}
+          >
+            {generating ? (
+              <>
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ animation: "spin 1s linear infinite" }}
+                >
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+                Generating…
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                PDF
+              </>
+            )}
+          </button>
+          <button
+            id="generate-excel-btn"
+            className="btn btn-secondary"
+            onClick={handleGenerateExcel}
+            disabled={generating || generatingExcel}
+            style={{ gap: "0.5rem", borderColor: "#059669", color: "#059669" }}
+          >
+            {generatingExcel ? (
+              <>
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ animation: "spin 1s linear infinite" }}
+                >
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+                Exporting…
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                Excel
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ── Filters ── */}
