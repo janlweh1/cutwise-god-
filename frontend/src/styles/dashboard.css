@@ -901,6 +901,11 @@
   color: var(--text-dark);
 }
 
+.scrap-summary-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .scrap-value-preview {
   background: #F0FDF4;
   border: 1px solid #BBF7D0;

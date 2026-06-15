@@ -191,7 +191,10 @@ class ScrapSale(models.Model):
         related_name="scrap_sales",
         help_text="The user who processed this sale.",
     )
-    quantity_sold = models.PositiveIntegerField(default=0)
+    quantity_sold = models.DecimalField(
+        max_digits=10, decimal_places=3, default=0,
+        help_text="Weight sold in kilograms.",
+    )
     sale_price_per_kg = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     sale_date = models.DateTimeField(auto_now_add=True)
@@ -220,6 +223,8 @@ class AuditLog(models.Model):
         SCRAP_SOLD = "scrap_sold", "Scrap Sold"
         STOCK_ADJUSTED = "stock_adjusted", "Stock Adjusted"
         SUPPLIER_ADDED = "supplier_added", "Supplier Added"
+        SUPPLIER_UPDATED = "supplier_updated", "Supplier Updated"
+        SUPPLIER_DELETED = "supplier_deleted", "Supplier Deleted"
         CONFIG_UPDATED = "config_updated", "Configuration Updated"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

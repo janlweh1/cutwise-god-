@@ -5,6 +5,7 @@ import { StatCard, StatCards } from "../../components/dashboard/StatCard";
 import InventoryView from "./views/InventoryView";
 import SupplierView from "./views/SupplierView";
 import ReportsView from "./views/ReportsView";
+import ScrapView from "./views/ScrapView";
 import api from "../../lib/api";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -171,19 +172,22 @@ const SupervisorHomeView = ({ fullName }) => {
   const [materials, setMaterials] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [scraps, setScraps] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [resMat, resSuppliers, resLogs] = await Promise.all([
+        const [resMat, resSuppliers, resLogs, resScraps] = await Promise.all([
           api.get("/inventory/materials/"),
           api.get("/inventory/suppliers/"),
           api.get("/inventory/logs/"),
+          api.get("/inventory/scrap/"),
         ]);
         setMaterials(resMat.data.results || resMat.data);
         setSuppliers(resSuppliers.data.results || resSuppliers.data);
         setLogs((resLogs.data.results || resLogs.data).slice(0, 5));
+        setScraps(resScraps.data.results || resScraps.data);
       } catch (err) {
         console.error("Error fetching supervisor home data:", err);
       } finally {
@@ -199,6 +203,8 @@ const SupervisorHomeView = ({ fullName }) => {
   const lowStockItems = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
   const lowStockCount = lowStockItems.length;
   const totalSuppliers = suppliers.length;
+  const availableScraps = scraps.filter((s) => s.status === "available");
+  const totalAvailableScrapKg = availableScraps.reduce((sum, s) => sum + Number(s.weight_kg), 0);
 
   /* ── Inventory distribution for donut chart ──── */
   const typeDistribution = materials.reduce((acc, m) => {
@@ -260,14 +266,14 @@ const SupervisorHomeView = ({ fullName }) => {
             />
             <StatCard
               label="Scrap Weight"
-              value={<span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: "500" }}>—</span>}
+              value={`${totalAvailableScrapKg.toFixed(2)} kg`}
               icon={
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 23 10 17 10" />
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                 </svg>
               }
-              sub="Waiting for integration"
+              sub="Available for sale"
             />
             <StatCard
               label="Active Suppliers"
@@ -429,7 +435,7 @@ export const SupervisorDashboard = () => {
       case "inventory":
         return <InventoryView />;
       case "scrap":
-        return <ScrapPlaceholder />;
+        return <ScrapView />;
       case "supplier":
         return <SupplierView />;
       case "audit_trail":

@@ -5,6 +5,8 @@ import { StatCard, StatCards } from "../../components/dashboard/StatCard";
 import InventoryView from "./views/InventoryView";
 import SupplierView from "./views/SupplierView";
 import ReportsView from "./views/ReportsView";
+import ScrapView from "./views/ScrapView";
+import ConfigurationView from "./views/ConfigurationView";
 import api from "../../lib/api";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -174,19 +176,22 @@ const HomeView = () => {
   const [materials, setMaterials] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [scraps, setScraps] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [resMat, resSuppliers, resLogs] = await Promise.all([
+        const [resMat, resSuppliers, resLogs, resScraps] = await Promise.all([
           api.get("/inventory/materials/"),
           api.get("/inventory/suppliers/"),
           api.get("/inventory/logs/"),
+          api.get("/inventory/scrap/"),
         ]);
         setMaterials(resMat.data.results || resMat.data);
         setSuppliers(resSuppliers.data.results || resSuppliers.data);
         setLogs((resLogs.data.results || resLogs.data).slice(0, 5));
+        setScraps(resScraps.data.results || resScraps.data);
       } catch (err) {
         console.error("Error fetching admin home data:", err);
       } finally {
@@ -202,6 +207,8 @@ const HomeView = () => {
   const lowStockItems = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
   const lowStockCount = lowStockItems.length;
   const totalSuppliers = suppliers.length;
+  const availableScraps = scraps.filter((s) => s.status === "available");
+  const totalAvailableScrapKg = availableScraps.reduce((sum, s) => sum + Number(s.weight_kg), 0);
 
   /* ── Inventory distribution for donut chart ──── */
   const typeDistribution = materials.reduce((acc, m) => {
@@ -263,14 +270,14 @@ const HomeView = () => {
             />
             <StatCard
               label="Scrap Weight"
-              value={<span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: "500" }}>—</span>}
+              value={`${totalAvailableScrapKg.toFixed(2)} kg`}
               icon={
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 23 10 17 10" />
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                 </svg>
               }
-              sub="Waiting for integration"
+              sub="Available for sale"
             />
             <StatCard
               label="Active Suppliers"
@@ -420,29 +427,13 @@ export const AdminDashboard = () => {
       case "inventory":
         return <InventoryView />;
       case "scrap":
-        return (
-          <div className="view-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-            <h2 style={{ fontSize: "1.75rem", fontWeight: "800", color: "var(--text-dark)", fontFamily: "var(--font-heading)" }}>Scrap Management</h2>
-            <p style={{ fontSize: "1.1rem", color: "var(--text-muted)", maxWidth: "480px", lineHeight: 1.6 }}>
-              Waiting for sales subsystem integration
-            </p>
-          </div>
-        );
+        return <ScrapView />;
       case "supplier":
         return <SupplierView />;
       case "audit_trail":
         return <ReportsView />;
       case "configuration":
-        return (
-          <div className="view-container">
-            <div className="view-header"><h2 className="view-title">Configuration</h2></div>
-            <div className="view-empty">Configuration module coming soon.</div>
-          </div>
-        );
+        return <ConfigurationView />;
       default:
         return <HomeView />;
     }

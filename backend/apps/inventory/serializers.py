@@ -50,6 +50,7 @@ class MaterialSerializer(serializers.ModelSerializer):
 
 class ScrapSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source="material.material_name", read_only=True)
+    material_type = serializers.CharField(source="material.material_type", read_only=True)
 
     class Meta:
         model = Scrap
@@ -57,6 +58,7 @@ class ScrapSerializer(serializers.ModelSerializer):
             "id",
             "material",
             "material_name",
+            "material_type",
             "weight_kg",
             "recorded_date",
             "status",
@@ -84,7 +86,7 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
             "sale_date",
             "profit",
         ]
-        read_only_fields = ["id", "sale_date", "sold_by"]
+        read_only_fields = ["id", "sale_date", "sold_by", "total_amount", "profit"]
 
     def get_sold_by_name(self, obj):
         if not obj.sold_by:
@@ -93,6 +95,20 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
             return obj.sold_by.profile.full_name or obj.sold_by.email
         except Exception:
             return obj.sold_by.email
+
+    def create(self, validated_data):
+        scrap = validated_data["scrap"]
+        weight = validated_data["quantity_sold"]
+        price_per_kg = validated_data["sale_price_per_kg"]
+        total_amount = weight * price_per_kg
+        # Profit = revenue - cost of the leather that became scrap
+        unit_cost = scrap.material.unit_cost or 0
+        profit = total_amount - (unit_cost * weight)
+        return ScrapSale.objects.create(
+            **validated_data,
+            total_amount=total_amount,
+            profit=profit,
+        )
 
 
 

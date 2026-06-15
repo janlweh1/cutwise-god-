@@ -56,6 +56,23 @@ class SupplierViewSet(viewsets.ModelViewSet):
             f"Added supplier: {instance.name}",
         )
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_action(
+            self.request.user,
+            AuditLog.ActionType.SUPPLIER_UPDATED,
+            f"Updated supplier: {instance.name}",
+        )
+
+    def perform_destroy(self, instance):
+        name = instance.name
+        log_action(
+            self.request.user,
+            AuditLog.ActionType.SUPPLIER_DELETED,
+            f"Deleted supplier: {name}",
+        )
+        instance.delete()
+
 
 # ──────────────────────────────────────────────
 # Material

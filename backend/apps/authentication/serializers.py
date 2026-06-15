@@ -68,3 +68,36 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.profile.full_name
         except UserProfile.DoesNotExist:
             return obj.first_name or ""
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Serializer for admin-facing user list — includes role, full_name and active status."""
+
+    role = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
+    role_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "date_joined", "is_active", "role", "role_display", "full_name"]
+        read_only_fields = ["id", "date_joined"]
+
+    def get_role(self, obj):
+        try:
+            return obj.profile.role
+        except Exception:
+            return "inventory_clerk"
+
+    def get_role_display(self, obj):
+        mapping = {
+            "inventory_clerk": "Inventory Clerk",
+            "supervisor": "Supervisor",
+            "admin": "Admin",
+        }
+        return mapping.get(self.get_role(obj), "Unknown")
+
+    def get_full_name(self, obj):
+        try:
+            return obj.profile.full_name or ""
+        except Exception:
+            return obj.first_name or ""

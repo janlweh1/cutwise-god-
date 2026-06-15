@@ -3,6 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import Sidebar from "../../components/dashboard/Sidebar";
 import InventoryView from "./views/InventoryView";
 import SupplierView from "./views/SupplierView";
+import ScrapView from "./views/ScrapView";
 import api from "../../lib/api";
 import "../../styles/dashboard.css";
 
@@ -39,14 +40,17 @@ const getSKU = (material) => {
 /* ── Dynamic Home View for Clerk ───────────────── */
 const EmployeeHomeView = () => {
   const [materials, setMaterials] = useState([]);
+  const [scraps, setScraps] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch raw materials
-        const resMat = await api.get("/inventory/materials/");
-        const rawMaterials = resMat.data.results || resMat.data;
-        setMaterials(rawMaterials);
+        const [resMat, resScraps] = await Promise.all([
+          api.get("/inventory/materials/"),
+          api.get("/inventory/scrap/"),
+        ]);
+        setMaterials(resMat.data.results || resMat.data);
+        setScraps(resScraps.data.results || resScraps.data);
       } catch (err) {
         console.error("Error fetching clerk home data:", err);
       }
@@ -58,7 +62,8 @@ const EmployeeHomeView = () => {
   const rawMaterialsTotal = materials.reduce((sum, m) => sum + m.quantity, 0);
   const lowStockItems = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
   const lowStockCount = lowStockItems.length;
-
+  const availableScraps = scraps.filter((s) => s.status === "available");
+  const totalAvailableScrapKg = availableScraps.reduce((sum, s) => sum + Number(s.weight_kg), 0);
 
 
   return (
@@ -106,7 +111,7 @@ const EmployeeHomeView = () => {
 
         <div className="stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-label">Scrap Today</span>
+            <span className="stat-card-label">Scrap Available</span>
             <div className="stat-card-icon" style={{ color: "#059669", backgroundColor: "#D1FAE5" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
@@ -114,8 +119,8 @@ const EmployeeHomeView = () => {
               </svg>
             </div>
           </div>
-          <div className="stat-card-value" style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: "500" }}>—</div>
-          <div className="stat-card-sub">Waiting for integration</div>
+          <div className="stat-card-value">{totalAvailableScrapKg.toFixed(2)} kg</div>
+          <div className="stat-card-sub">Available for sale</div>
         </div>
       </div>
 
@@ -167,18 +172,7 @@ export const EmployeeDashboard = () => {
       case "inventory":
         return <InventoryView />;
       case "scrap":
-        return (
-          <div className="view-container" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-            <h2 style={{ fontSize: "1.75rem", fontWeight: "800", color: "var(--text-dark)", fontFamily: "var(--font-heading)" }}>Scrap Management</h2>
-            <p style={{ fontSize: "1.1rem", color: "var(--text-muted)", maxWidth: "480px", lineHeight: 1.6 }}>
-              Waiting for sales subsystem integration
-            </p>
-          </div>
-        );
+        return <ScrapView />;
       case "supplier":
         return <SupplierView />;
       default:
