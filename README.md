@@ -231,44 +231,6 @@ The app will be available at **http://localhost:5173**.
 
 ---
 
-## API Endpoints
-
-### Authentication
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/v1/auth/register/` | Register a new user | No |
-| `POST` | `/api/v1/auth/login/` | Obtain JWT tokens | No |
-| `POST` | `/api/v1/auth/token/refresh/` | Refresh access token | No |
-| `GET` | `/api/v1/auth/me/` | Get current user profile | Yes |
-
-### Inventory
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `GET` | `/api/v1/inventory/categories/` | List all categories | Yes |
-| `POST` | `/api/v1/inventory/categories/` | Create a category | Yes |
-| `GET` | `/api/v1/inventory/categories/:id/` | Retrieve a category | Yes |
-| `PUT` | `/api/v1/inventory/categories/:id/` | Update a category | Yes |
-| `DELETE` | `/api/v1/inventory/categories/:id/` | Delete a category | Yes |
-| `GET` | `/api/v1/inventory/products/` | List all products | Yes |
-| `POST` | `/api/v1/inventory/products/` | Create a product | Yes |
-| `GET` | `/api/v1/inventory/products/:id/` | Retrieve a product | Yes |
-| `PUT` | `/api/v1/inventory/products/:id/` | Update a product | Yes |
-| `DELETE` | `/api/v1/inventory/products/:id/` | Delete a product | Yes |
-| `GET` | `/api/v1/inventory/stock-movements/` | List stock movements | Yes |
-| `POST` | `/api/v1/inventory/stock-movements/` | Record a stock movement | Yes |
-
-### System
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `GET` | `/api/v1/health/` | API health check | No |
-
-> Note: All list endpoints support `?search=` and `?ordering=` query parameters.
-
----
-
 ## Environment Variables
 
 ### Backend (`backend/.env`)
@@ -278,7 +240,7 @@ The app will be available at **http://localhost:5173**.
 | `DJANGO_SECRET_KEY` | Django secret key | `your-random-secret-key` |
 | `DJANGO_DEBUG` | Enable debug mode | `True` |
 | `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | `localhost,127.0.0.1` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://cutwise_user:cutwise_pass@localhost:5432/cutwise_db` |
+| `DATABASE_URL` | PostgreSQL connection string | postgresql://db_user:db_password@localhost:5432/your_db_name|
 | `CORS_ALLOWED_ORIGINS` | Allowed CORS origins | `http://localhost:5173` |
 
 ### Frontend (`frontend/.env`)
