@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
-import RoleSelectPage from "./pages/auth/RoleSelectPage";
 import LoginPage from "./pages/auth/LoginPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import AccountActivationPage from "./pages/auth/AccountActivationPage";
 import EmployeeDashboard from "./pages/dashboard/EmployeeDashboard";
 import SupervisorDashboard from "./pages/dashboard/SupervisorDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
@@ -14,9 +15,11 @@ function App() {
       <AuthProvider>
         <Routes>
           {/* Public Auth Routes */}
-          <Route path="/" element={<RoleSelectPage />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
+          <Route path="/activate/:uid/:token" element={<AccountActivationPage />} />
 
           {/* Protected Dashboards */}
           <Route 

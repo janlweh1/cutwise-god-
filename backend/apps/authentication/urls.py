@@ -18,4 +18,6 @@ urlpatterns = [
 
     # Self-service
     path("change-password/", views.ChangePasswordView.as_view(), name="change-password"),
+    path("reset-password/", views.reset_password_confirm, name="reset-password-confirm"),
+    path("activate/", views.activate_account, name="activate-account"),
 ]

@@ -64,7 +64,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -166,3 +166,18 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:5173", "http://127.0.0.1:5173"],
 )
 CORS_ALLOW_CREDENTIALS = True
+
+# ──────────────────────────────────────────────
+# Email (Gmail SMTP)
+# ──────────────────────────────────────────────
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = env("EMAIL_FROM", default="Otto Shoes IMS <noreply@gmail.com>")
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+PASSWORD_RESET_TIMEOUT = 3600  # reset link valid for 1 hour
+ACCOUNT_ACTIVATION_TIMEOUT = 60 * 60 * 24 * 7  # activation link valid for 7 days

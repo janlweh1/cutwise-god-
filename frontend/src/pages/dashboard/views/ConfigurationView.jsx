@@ -94,7 +94,7 @@ const UserManagementTab = ({ currentUserId }) => {
   const [submitting, setSubmitting]     = useState(false);
 
   const [addForm, setAddForm] = useState({
-    full_name: "", email: "", username: "", password: "", role: "inventory_clerk",
+    full_name: "", email: "", role: "inventory_clerk",
   });
   const [addErrors, setAddErrors] = useState({});
 
@@ -124,8 +124,6 @@ const UserManagementTab = ({ currentUserId }) => {
     const errs = {};
     if (!addForm.full_name.trim())  errs.full_name = "Full name is required.";
     if (!addForm.email.trim())      errs.email     = "Email is required.";
-    if (!addForm.username.trim())   errs.username  = "Username is required.";
-    if (addForm.password.length < 8) errs.password = "Password must be at least 8 characters.";
     setAddErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -138,13 +136,11 @@ const UserManagementTab = ({ currentUserId }) => {
       await api.post("/auth/users/", {
         full_name: addForm.full_name.trim(),
         email:     addForm.email.trim(),
-        username:  addForm.username.trim(),
-        password:  addForm.password,
         role:      addForm.role,
       });
-      showNotif("User created successfully.");
+      showNotif("User created. An activation email has been sent to their inbox.");
       setShowAddModal(false);
-      setAddForm({ full_name: "", email: "", username: "", password: "", role: "inventory_clerk" });
+      setAddForm({ full_name: "", email: "", role: "inventory_clerk" });
       fetchUsers();
     } catch (err) {
       const data = err.response?.data;
@@ -312,9 +308,9 @@ const UserManagementTab = ({ currentUserId }) => {
               </div>
               <div className="form-row-2">
                 <div className="form-group">
-                  <label>Username *</label>
-                  <input value={addForm.username} onChange={(e) => setAddForm({ ...addForm, username: e.target.value })} id="new-user-username" />
-                  {addErrors.username && <span className="form-error">{addErrors.username}</span>}
+                  <label>Email *</label>
+                  <input type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} id="new-user-email" />
+                  {addErrors.email && <span className="form-error">{addErrors.email}</span>}
                 </div>
                 <div className="form-group">
                   <label>Role</label>
@@ -323,15 +319,8 @@ const UserManagementTab = ({ currentUserId }) => {
                   </select>
                 </div>
               </div>
-              <div className="form-group">
-                <label>Email *</label>
-                <input type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} id="new-user-email" />
-                {addErrors.email && <span className="form-error">{addErrors.email}</span>}
-              </div>
-              <div className="form-group">
-                <label>Password *</label>
-                <input type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} placeholder="Min 8 characters" id="new-user-password" />
-                {addErrors.password && <span className="form-error">{addErrors.password}</span>}
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", background: "#F9FAFB", borderRadius: "8px", padding: "0.6rem 0.9rem" }}>
+                📧 An activation email will be sent to the user's Gmail so they can set their own password.
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
@@ -392,8 +381,217 @@ const UserManagementTab = ({ currentUserId }) => {
 };
 
 /* ══════════════════════════════════════════════
-   Tab B — System Info
+   Tab D — Threshold Configuration
    ══════════════════════════════════════════════ */
+const STOCK_STATUS_STYLES = {
+  in_stock:     { bg: "#D1FAE5", color: "#065F46", label: "In Stock"     },
+  low_stock:    { bg: "#FEF3C7", color: "#92400E", label: "Low Stock"    },
+  out_of_stock: { bg: "#FEE2E2", color: "#991B1B", label: "Out of Stock" },
+};
+
+const ThresholdTab = () => {
+  const [materials, setMaterials]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [search, setSearch]           = useState("");
+  const [editingId, setEditingId]     = useState(null);
+  const [editValue, setEditValue]     = useState("");
+  const [saving, setSaving]           = useState(false);
+  const [notification, setNotification] = useState(null);
+
+  const showNotif = (msg, type = "success") => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
+  const fetchMaterials = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/inventory/materials/");
+      setMaterials(res.data);
+    } catch {
+      showNotif("Failed to load materials.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchMaterials(); }, [fetchMaterials]);
+
+  const filtered = materials.filter((m) =>
+    m.material_name.toLowerCase().includes(search.toLowerCase()) ||
+    m.material_type.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const startEdit = (m) => {
+    setEditingId(m.id);
+    setEditValue(String(m.min_stock));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const saveThreshold = async (m) => {
+    const val = parseInt(editValue, 10);
+    if (isNaN(val) || val < 0) {
+      showNotif("Threshold must be a non-negative whole number.", "error");
+      return;
+    }
+    if (val === m.min_stock) { cancelEdit(); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/inventory/materials/${m.id}/`, { min_stock: val });
+      showNotif(`Threshold for "${m.material_name}" updated to ${val}.`);
+      cancelEdit();
+      fetchMaterials();
+    } catch {
+      showNotif("Failed to save threshold.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      {notification && (
+        <div className={`notif notif-${notification.type}`}>{notification.msg}</div>
+      )}
+
+      {/* Header info */}
+      <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1.25rem", lineHeight: 1.5 }}>
+        Set the <strong>minimum stock threshold</strong> for each material. When a material's quantity
+        falls at or below this value, it will be flagged as <span style={{ color: "#92400E", fontWeight: 600 }}>Low Stock</span>.
+      </p>
+
+      {/* Search */}
+      <div style={{ marginBottom: "1rem", maxWidth: "340px" }}>
+        <div className="auth-input-wrapper" style={{ boxShadow: "var(--shadow-sm)", borderRadius: "8px" }}>
+          <span className="auth-input-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </span>
+          <input
+            className="auth-input"
+            style={{ fontSize: "0.85rem", padding: "0.5rem 0.75rem 0.5rem 2.25rem" }}
+            placeholder="Search by material name or type…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="view-loading">Loading materials…</div>
+      ) : filtered.length === 0 ? (
+        <div className="view-loading">No materials found.</div>
+      ) : (
+        <div className="table-wrapper">
+          <table className="data-table" id="threshold-table">
+            <thead>
+              <tr>
+                <th>Material Name</th>
+                <th>Type</th>
+                <th style={{ textAlign: "center" }}>Current Stock</th>
+                <th style={{ textAlign: "center" }}>Low-Stock Threshold</th>
+                <th style={{ textAlign: "center" }}>Status</th>
+                <th style={{ textAlign: "center" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((m) => {
+                const ss = STOCK_STATUS_STYLES[m.stock_status] || STOCK_STATUS_STYLES.in_stock;
+                const isEditing = editingId === m.id;
+                return (
+                  <tr key={m.id} style={{ opacity: saving && isEditing ? 0.6 : 1 }}>
+                    <td className="td-bold">{m.material_name}</td>
+                    <td style={{ color: "var(--text-muted)", fontSize: "0.82rem", textTransform: "capitalize" }}>{m.material_type.replace("_", " ")}</td>
+                    <td style={{ textAlign: "center", fontWeight: 700 }}>{m.quantity}</td>
+
+                    {/* Threshold cell */}
+                    <td style={{ textAlign: "center" }}>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveThreshold(m); if (e.key === "Escape") cancelEdit(); }}
+                          autoFocus
+                          style={{
+                            width: "72px", textAlign: "center",
+                            padding: "4px 8px", border: "2px solid var(--primary)",
+                            borderRadius: "6px", fontSize: "0.875rem", fontWeight: 700,
+                            outline: "none",
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontWeight: 600, color: m.quantity <= m.min_stock && m.quantity > 0 ? "#92400E" : "inherit" }}>
+                          {m.min_stock}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Status badge */}
+                    <td style={{ textAlign: "center" }}>
+                      <span style={{
+                        display: "inline-block", padding: "2px 10px",
+                        borderRadius: "999px", fontSize: "0.72rem", fontWeight: 700,
+                        background: ss.bg, color: ss.color,
+                      }}>
+                        {ss.label}
+                      </span>
+                    </td>
+
+                    {/* Action buttons */}
+                    <td>
+                      <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+                        {isEditing ? (
+                          <>
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: "3px 10px", fontSize: "0.78rem" }}
+                              onClick={() => saveThreshold(m)}
+                              disabled={saving}
+                            >
+                              {saving ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: "3px 10px", fontSize: "0.78rem" }}
+                              onClick={cancelEdit}
+                              disabled={saving}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="btn-icon"
+                            title="Edit threshold"
+                            id={`edit-threshold-${m.id}`}
+                            onClick={() => startEdit(m)}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SystemInfoTab = () => (
   <div>
     <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
@@ -568,6 +766,17 @@ const TABS = [
     ),
   },
   {
+    id: "thresholds",
+    label: "Thresholds",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    ),
+  },
+  {
     id: "system",
     label: "System Info",
     icon: (
@@ -606,9 +815,10 @@ export const ConfigurationView = () => {
 
       <TabBar tabs={TABS} active={activeTab} onSelect={setActiveTab} />
 
-      {activeTab === "users"   && <UserManagementTab currentUserId={currentUserId} />}
-      {activeTab === "system"  && <SystemInfoTab />}
-      {activeTab === "account" && <MyAccountTab fullName={fullName} userEmail={userEmail} />}
+      {activeTab === "users"      && <UserManagementTab currentUserId={currentUserId} />}
+      {activeTab === "thresholds" && <ThresholdTab />}
+      {activeTab === "system"     && <SystemInfoTab />}
+      {activeTab === "account"    && <MyAccountTab fullName={fullName} userEmail={userEmail} />}
     </div>
   );
 };

@@ -609,7 +609,7 @@ export const ReportsView = () => {
 
       {/* ── Header ── */}
       <div className="view-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
-        <h2 className="view-title">Audit Trail</h2>
+        <h2 className="view-title">Audit Logs</h2>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           {/* Report date picker */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>

@@ -6,7 +6,7 @@ from .models import UserProfile
 class RegisterSerializer(serializers.ModelSerializer):
     """Serializer for creating a new user account."""
 
-    password = serializers.CharField(write_only=True, min_length=8)
+    password = serializers.CharField(write_only=True, min_length=8, required=False, allow_blank=True)
     role = serializers.ChoiceField(
         choices=UserProfile.Role.choices,
         default=UserProfile.Role.INVENTORY_CLERK,
@@ -17,17 +17,29 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "password", "role", "full_name"]
+        extra_kwargs = {"username": {"required": False}}
 
     def create(self, validated_data):
         role = validated_data.pop("role", UserProfile.Role.INVENTORY_CLERK)
         full_name = validated_data.pop("full_name", "")
+        password = validated_data.pop("password", None)
 
-        user = User.objects.create_user(
-            username=validated_data.get("username", validated_data.get("email", "")),
-            email=validated_data.get("email", ""),
-            password=validated_data["password"],
+        # Auto-set username to email if not explicitly provided
+        email = validated_data.get("email", "")
+        username = validated_data.get("username", "") or email
+
+        user = User(
+            username=username,
+            email=email,
             first_name=full_name[:30] if full_name else "",
         )
+
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()  # account inactive until activation email
+
+        user.save()
 
         # The signal creates the profile; update it with the given values
         profile = user.profile

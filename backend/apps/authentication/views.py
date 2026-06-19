@@ -5,6 +5,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
 from .serializers import RegisterSerializer, UserSerializer, AdminUserSerializer
 from .jwt_serializers import CustomTokenObtainPairSerializer
 from .models import UserProfile
@@ -17,7 +23,7 @@ class UserListView(APIView):
     """
     Admin-only: list all users or create a new one.
     GET  /auth/users/  — returns all users with profile info
-    POST /auth/users/  — create a new user (delegates to RegisterSerializer)
+    POST /auth/users/  — create a new user (inactive) and send activation email
     """
     permission_classes = [IsAdminUserRole]
 
@@ -29,8 +35,54 @@ class UserListView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response({"detail": "User created successfully."}, status=status.HTTP_201_CREATED)
+            user = serializer.save()
+
+            # Mark account as inactive until user activates via email
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+
+            # Generate activation token
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+
+            # Get role display name
+            role_display_map = {
+                "inventory_clerk": "Inventory Clerk",
+                "supervisor": "Supervisor",
+                "admin": "Admin",
+            }
+            profile = getattr(user, "profile", None)
+            role_display = role_display_map.get(profile.role if profile else "", "Staff")
+            full_name = profile.full_name if profile else ""
+
+            # Send activation email
+            try:
+                send_mail(
+                    subject="Activate your Otto Shoes IMS account",
+                    message=(
+                        f"Hi {full_name or user.email},\n\n"
+                        f"An administrator has created an account for you with the role: {role_display}.\n\n"
+                        f"Click the link below to set your password and activate your account:\n"
+                        f"{settings.FRONTEND_URL}/activate/{uid}/{token}/\n\n"
+                        f"This link expires in 7 days. If you did not expect this, you can ignore this email.\n\n"
+                        f"— Otto Shoes Manufacturing System"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                # If email fails, delete the user so admin can retry
+                user.delete()
+                return Response(
+                    {"detail": f"Failed to send activation email: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            return Response(
+                {"detail": "User created. An activation email has been sent to their inbox."},
+                status=status.HTTP_201_CREATED,
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -241,11 +293,8 @@ def current_user(request):
 @permission_classes([permissions.AllowAny])
 def forgot_password(request):
     """
-    Initiate a password reset.
-
-    Currently acknowledges the request but does not send an email.
-    To enable real email resets, configure Django's EMAIL_BACKEND
-    and call: django.contrib.auth.forms.PasswordResetForm(...).save(...)
+    Sends a real password reset email via Gmail SMTP.
+    Always returns success to prevent user enumeration.
     """
     email = request.data.get("email", "").strip()
     if not email:
@@ -254,10 +303,117 @@ def forgot_password(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Always return success to prevent user enumeration
-    # TODO: integrate SMTP here when email is configured
+    # Use Django's built-in PasswordResetForm for secure token generation
+    form = PasswordResetForm({"email": email})
+    if form.is_valid():
+        form.save(
+            request=request,
+            use_https=False,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            email_template_name="registration/password_reset_email.html",
+            subject_template_name="registration/password_reset_subject.txt",
+            extra_email_context={
+                "frontend_url": settings.FRONTEND_URL,
+            },
+        )
+
+    # Always return success (prevents user enumeration)
     return Response(
         {"detail": "If an account with that email exists, a reset link has been sent."},
         status=status.HTTP_200_OK,
     )
 
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def reset_password_confirm(request):
+    """
+    Validates the reset token and sets the new password.
+    Body: { uid, token, new_password }
+    """
+    uid = request.data.get("uid", "")
+    token = request.data.get("token", "")
+    new_password = request.data.get("new_password", "")
+
+    if not uid or not token or not new_password:
+        return Response(
+            {"detail": "uid, token, and new_password are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if len(new_password) < 8:
+        return Response(
+            {"detail": "Password must be at least 8 characters."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Decode the user id
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=user_id)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        return Response(
+            {"detail": "Reset link is invalid or has expired."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Validate the token
+    if not default_token_generator.check_token(user, token):
+        return Response(
+            {"detail": "Reset link is invalid or has expired."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Set the new password
+    user.set_password(new_password)
+    user.save()
+
+    return Response({"detail": "Password reset successfully. You can now log in."})
+
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def activate_account(request):
+    """
+    Validates the activation token, sets the user's password, and activates the account.
+    Body: { uid, token, password }
+    """
+    uid = request.data.get("uid", "")
+    token = request.data.get("token", "")
+    password = request.data.get("password", "")
+
+    if not uid or not token or not password:
+        return Response(
+            {"detail": "uid, token, and password are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if len(password) < 8:
+        return Response(
+            {"detail": "Password must be at least 8 characters."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Decode the user id
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=user_id)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        return Response(
+            {"detail": "This activation link is invalid or has expired."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Validate the token (works even for inactive users)
+    if not default_token_generator.check_token(user, token):
+        return Response(
+            {"detail": "This activation link is invalid or has expired."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Set password and activate the account
+    user.set_password(password)
+    user.is_active = True
+    user.save()
+
+    return Response({"detail": "Account activated successfully. You can now log in."})

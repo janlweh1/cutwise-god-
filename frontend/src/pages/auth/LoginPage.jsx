@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import HeroPanel from "../../components/auth/HeroPanel";
 import logoImg from "../../assets/otto-logo.svg";
@@ -7,19 +7,8 @@ import { logRemote } from "../../lib/logger";
 import "../../styles/auth.css";
 
 export const LoginPage = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { signIn, signOut } = useAuth();
-
-  const roleParam = searchParams.get("role")?.toLowerCase();
-  const validRoles = ["inventory_clerk", "admin", "supervisor"];
-
-  // Redirect if role is invalid
-  useEffect(() => {
-    if (!roleParam || !validRoles.includes(roleParam)) {
-      navigate("/", { replace: true });
-    }
-  }, [roleParam, navigate]);
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,15 +17,10 @@ export const LoginPage = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Capitalize helper
-  const capitalize = (str) => {
-    if (!str) return "";
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    logRemote(`LoginPage: handleSubmit triggered for email=${email}, role=${roleParam}`, "info");
+    logRemote(`LoginPage: handleSubmit triggered for email=${email}`, "info");
     if (!email || !password) {
       setError("Please fill in all fields.");
       return;
@@ -46,30 +30,21 @@ export const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      // 1. Sign in — role and full_name come back in the JWT response
+      // 1. Sign in — role comes back in the JWT response
       logRemote("LoginPage: calling signIn...", "info");
       const data = await signIn(email, password);
       logRemote(`LoginPage: signIn resolved. role=${data?.role}`, "info");
 
-      // 2. Verify the user's actual role matches the selected login role
-      if (data.role !== roleParam) {
-        logRemote(`LoginPage: role mismatch: data.role=${data.role} vs roleParam=${roleParam}, signing out...`, "warn");
-        await signOut();
-        setError(`Access Denied: Your account does not have the "${capitalize(roleParam)}" role.`);
-        setSubmitting(false);
-        return;
-      }
-
-      // 3. Handle remember me
+      // 2. Handle remember me
       if (rememberMe) {
         localStorage.setItem("remember_email", email);
       } else {
         localStorage.removeItem("remember_email");
       }
 
-      // 4. Redirect based on role
-      logRemote(`LoginPage: redirecting to /dashboard/${roleParam}`, "info");
-      navigate(`/dashboard/${roleParam}`, { replace: true });
+      // 3. Redirect based on role returned from the database
+      logRemote(`LoginPage: redirecting to /dashboard/${data.role}`, "info");
+      navigate(`/dashboard/${data.role}`, { replace: true });
     } catch (err) {
       logRemote(`LoginPage: exception caught: ${err.message || err}`, "error");
       setError(err.message || "An unexpected error occurred. Please try again.");
@@ -98,15 +73,6 @@ export const LoginPage = () => {
       {/* Right Form Panel */}
       <div className="auth-form-panel">
         <div className="auth-form-wrapper">
-          {/* Back to roles */}
-          <Link to="/" className="auth-back-link">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-            Back to roles
-          </Link>
-
           {/* Logo & Brand */}
           <div className="auth-branding">
             <img src={logoImg} className="auth-logo" alt="OTTO Logo" />
@@ -116,7 +82,7 @@ export const LoginPage = () => {
           {/* Titles */}
           <h2 className="auth-title">Welcome back!</h2>
           <p className="auth-subtitle">
-            Signing in as <strong>{capitalize(roleParam)}</strong>. Please enter your credentials.
+            Please enter your credentials to continue.
           </p>
 
           {/* Error Message Box */}

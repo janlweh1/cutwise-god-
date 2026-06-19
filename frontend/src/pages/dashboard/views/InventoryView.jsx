@@ -145,9 +145,13 @@ export const InventoryView = () => {
   const validate = () => {
     const errs = {};
     if (!form.material_name.trim()) errs.material_name = "Material name is required.";
+    if (!form.size_val && form.size_val !== 0)  errs.size_val = "Size is required.";
+    else if (Number(form.size_val) < 0)          errs.size_val = "Size cannot be negative.";
     if (!form.quantity || Number(form.quantity) < 0) errs.quantity = "Valid quantity is required.";
     if (!form.unit_cost || Number(form.unit_cost) < 0) errs.unit_cost = "Valid unit cost is required.";
     if (!form.supplier) errs.supplier = "Supplier is required.";
+    if (form.min_stock === "" || form.min_stock === null) errs.min_stock = "Reorder level is required.";
+    else if (Number(form.min_stock) < 0)         errs.min_stock = "Reorder level cannot be negative.";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -345,7 +349,7 @@ export const InventoryView = () => {
                   )}
                 </div>
                 <div className="form-group">
-                  <label>Size</label>
+                  <label>Size *</label>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <input
                       name="size_val"
@@ -354,8 +358,9 @@ export const InventoryView = () => {
                       min="0"
                       value={form.size_val}
                       onChange={handleChange}
+                      onKeyDown={(e) => e.key === "-" && e.preventDefault()}
                       placeholder="e.g., 12"
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, borderColor: errors.size_val ? "#EF4444" : undefined }}
                     />
                     <select
                       name="size_unit"
@@ -371,6 +376,7 @@ export const InventoryView = () => {
                       <option value="liters">liters</option>
                     </select>
                   </div>
+                  {errors.size_val && <span className="form-error">{errors.size_val}</span>}
                 </div>
               </div>
 
@@ -399,8 +405,17 @@ export const InventoryView = () => {
                   {errors.supplier && <span className="form-error">{errors.supplier}</span>}
                 </div>
                 <div className="form-group">
-                  <label>Reorder Level</label>
-                  <input name="min_stock" type="number" min="0" value={form.min_stock} onChange={handleChange} />
+                  <label>Reorder Level *</label>
+                  <input
+                    name="min_stock"
+                    type="number"
+                    min="0"
+                    value={form.min_stock}
+                    onChange={handleChange}
+                    onKeyDown={(e) => e.key === "-" && e.preventDefault()}
+                    style={{ borderColor: errors.min_stock ? "#EF4444" : undefined }}
+                  />
+                  {errors.min_stock && <span className="form-error">{errors.min_stock}</span>}
                 </div>
               </div>
 
