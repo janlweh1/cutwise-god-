@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
 
@@ -8,9 +9,37 @@ class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
         fields = ["id", "name", "contact_person", "phone", "email", "address", "material_count"]
+        extra_kwargs = {
+            "name": {"required": True, "allow_blank": False},
+            "contact_person": {"required": True, "allow_blank": False},
+            "phone": {"required": True, "allow_blank": False},
+            "email": {"required": True, "allow_blank": False},
+        }
 
     def get_material_count(self, obj):
         return obj.materials.count()
+
+    def validate_phone(self, value):
+        import phonenumbers
+        from phonenumbers import NumberParseException
+
+        value = " ".join(value.strip().split())
+
+        try:
+            parsed_number = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(parsed_number):
+                raise serializers.ValidationError(
+                    "Invalid international phone number structure or digit count."
+                )
+
+            formatted = phonenumbers.format_number(
+                parsed_number, phonenumbers.PhoneNumberFormat.INTERNATIONAL
+            )
+            return formatted
+        except NumberParseException:
+            raise serializers.ValidationError(
+                "Phone number must start with a valid country code (e.g. +63) followed by the phone number."
+            )
 
 
 class MaterialSerializer(serializers.ModelSerializer):
@@ -96,7 +125,32 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
         except Exception:
             return obj.sold_by.email
 
+    def validate(self, attrs):
+        scrap = attrs.get("scrap")
+        quantity_sold = attrs.get("quantity_sold")
+
+        if scrap.status == Scrap.ScrapStatus.SOLD:
+            raise serializers.ValidationError(
+                {"scrap": "This scrap record has already been fully sold."}
+            )
+
+        if quantity_sold <= 0:
+            raise serializers.ValidationError(
+                {"quantity_sold": "Weight to sell must be greater than zero."}
+            )
+
+        if quantity_sold > scrap.weight_kg:
+            raise serializers.ValidationError(
+                {
+                    "quantity_sold": f"Cannot sell more than the available weight of {scrap.weight_kg:.3f} kg."
+                }
+            )
+
+        return attrs
+
     def create(self, validated_data):
+        from django.db import transaction
+
         scrap = validated_data["scrap"]
         weight = validated_data["quantity_sold"]
         price_per_kg = validated_data["sale_price_per_kg"]
@@ -104,11 +158,31 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
         # Profit = revenue - cost of the leather that became scrap
         unit_cost = scrap.material.unit_cost or 0
         profit = total_amount - (unit_cost * weight)
-        return ScrapSale.objects.create(
-            **validated_data,
-            total_amount=total_amount,
-            profit=profit,
-        )
+
+        with transaction.atomic():
+            # Lock the scrap record to prevent race conditions during concurrent requests
+            scrap = Scrap.objects.select_for_update().get(pk=scrap.pk)
+
+            # Re-verify weight under lock
+            if weight > scrap.weight_kg:
+                raise serializers.ValidationError(
+                    {
+                        "quantity_sold": f"Cannot sell more than the available weight of {scrap.weight_kg:.3f} kg."
+                    }
+                )
+
+            # Deduct the weight and adjust status if sold out
+            scrap.weight_kg -= weight
+            if scrap.weight_kg <= 0:
+                scrap.weight_kg = 0
+                scrap.status = Scrap.ScrapStatus.SOLD
+            scrap.save(update_fields=["weight_kg", "status"])
+
+            return ScrapSale.objects.create(
+                **validated_data,
+                total_amount=total_amount,
+                profit=profit,
+            )
 
 
 

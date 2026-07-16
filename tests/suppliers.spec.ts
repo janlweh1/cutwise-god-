@@ -7,7 +7,6 @@ const BASE_URL = 'http://localhost:5173';
 // ─────────────────────────────────────────────────────────────
 async function goToSuppliers(page: Page) {
   await page.goto(BASE_URL);
-  await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
   await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
   await page.getByRole('textbox', { name: 'Password' }).fill('password123');
   await page.getByRole('button', { name: 'Sign In' }).click();

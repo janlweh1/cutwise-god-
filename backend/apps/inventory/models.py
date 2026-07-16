@@ -34,7 +34,7 @@ class Material(models.Model):
     # Preset type slugs — used for frontend dropdown mapping
     PRESET_TYPES = [
         "cowhide", "goatskin", "sheepskin", "suede", "nappa",
-        "synthetic", "rubber", "thread", "adhesive", "accessory", "other",
+        "synthetic", "other",
     ]
 
     class MaterialType:
@@ -44,10 +44,6 @@ class Material(models.Model):
         SUEDE = "suede"
         NAPPA = "nappa"
         SYNTHETIC = "synthetic"
-        RUBBER = "rubber"
-        THREAD = "thread"
-        ADHESIVE = "adhesive"
-        ACCESSORY = "accessory"
         OTHER = "other"
 
     class StockStatus(models.TextChoices):
@@ -106,10 +102,6 @@ class Material(models.Model):
             "suede": "Suede",
             "nappa": "Nappa Leather",
             "synthetic": "Synthetic Leather",
-            "rubber": "Rubber",
-            "thread": "Thread",
-            "adhesive": "Adhesive",
-            "accessory": "Accessory",
             "other": "Other",
         }
         return mapping.get(self.material_type, self.material_type.title())

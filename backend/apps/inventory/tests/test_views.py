@@ -50,7 +50,7 @@ class TestSupplierEndpoints:
         assert response.status_code == status.HTTP_200_OK
         
         data = response.data
-        results = data.get("results", data)
+        results = data.get("results", data) if isinstance(data, dict) else data
         assert len(results) == 2
 
     def test_create_supplier(self, authenticated_client):
@@ -58,23 +58,57 @@ class TestSupplierEndpoints:
         payload = {
             "name": "Supplier C",
             "contact_person": "Charles",
+            "phone": "+63 908 442 3843",
             "email": "charles@supplierc.com",
             "address": "123 Leather Street, Manila"
         }
         response = authenticated_client.post(url, payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["name"] == "Supplier C"
+        assert response.data["phone"] == "+63 908 442 3843"
         assert response.data["address"] == "123 Leather Street, Manila"
 
         # Verify in database
         supp = Supplier.objects.get(name="Supplier C")
         assert supp.address == "123 Leather Street, Manila"
+        assert supp.phone == "+63 908 442 3843"
         
         # Verify supplier_added audit log is created
         assert AuditLog.objects.filter(
             action=AuditLog.ActionType.SUPPLIER_ADDED,
             username="John Employee"
         ).exists()
+
+    def test_create_supplier_missing_required_fields(self, authenticated_client):
+        url = reverse("inventory:supplier-list")
+        # Missing contact_person and phone
+        payload = {
+            "name": "Supplier Bad Required",
+            "email": "bad@supplier.com"
+        }
+        response = authenticated_client.post(url, payload, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "contact_person" in response.data
+        assert "phone" in response.data
+
+    def test_create_supplier_invalid_phone_format(self, authenticated_client):
+        url = reverse("inventory:supplier-list")
+        # Invalid country code (+99)
+        payload = {
+            "name": "Supplier Bad Phone 1",
+            "contact_person": "Charles",
+            "phone": "+99 908 442 3843",
+            "email": "badphone@supplier.com"
+        }
+        response = authenticated_client.post(url, payload, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "phone" in response.data
+
+        # Invalid Philippines phone length (9 digits instead of 10)
+        payload["phone"] = "+63 908 442 384"
+        response = authenticated_client.post(url, payload, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "phone" in response.data
 
 
 @pytest.mark.django_db
@@ -133,19 +167,19 @@ class TestMaterialEndpoints:
         
         # Low stock filter
         response = authenticated_client.get(url, {"stock_status": "low_stock"})
-        results = response.data.get("results", response.data)
+        results = response.data.get("results", response.data) if isinstance(response.data, dict) else response.data
         assert len(results) == 1
         assert results[0]["material_name"] == "Mat Low Stock"
 
         # Out of stock filter
         response = authenticated_client.get(url, {"stock_status": "out_of_stock"})
-        results = response.data.get("results", response.data)
+        results = response.data.get("results", response.data) if isinstance(response.data, dict) else response.data
         assert len(results) == 1
         assert results[0]["material_name"] == "Mat Out Of Stock"
 
         # In stock filter
         response = authenticated_client.get(url, {"stock_status": "in_stock"})
-        results = response.data.get("results", response.data)
+        results = response.data.get("results", response.data) if isinstance(response.data, dict) else response.data
         assert len(results) == 1
         assert results[0]["material_name"] == "Mat In Stock"
 
@@ -156,7 +190,7 @@ class TestMaterialEndpoints:
         url = reverse("inventory:material-list")
         
         response = authenticated_client.get(url, {"search": "Zebra"})
-        results = response.data.get("results", response.data)
+        results = response.data.get("results", response.data) if isinstance(response.data, dict) else response.data
         assert len(results) == 1
         assert results[0]["material_name"] == "Zebra Leather pattern"
 
@@ -219,26 +253,49 @@ class TestScrapEndpoints:
             username="John Employee"
         ).exists()
 
-        # 2. Sell Scrap
+        # 2. Sell Partial Scrap (1.000 kg out of 3.450 kg)
         sale_url = reverse("inventory:scrap-sale-list")
         sale_payload = {
             "scrap": scrap_id,
-            "quantity_sold": 1,
-            "sale_price_per_kg": 100.00,
-            "total_amount": 345.00,
-            "profit": 200.00
+            "quantity_sold": 1.000,
+            "sale_price_per_kg": 100.00
         }
         sale_response = authenticated_client.post(sale_url, sale_payload, format="json")
         assert sale_response.status_code == status.HTTP_201_CREATED
         
-        # Check scrap is now SOLD
-        assert Scrap.objects.get(id=scrap_id).status == Scrap.ScrapStatus.SOLD
+        # Check scrap is still AVAILABLE, and weight is updated to 2.450
+        scrap = Scrap.objects.get(id=scrap_id)
+        assert scrap.status == Scrap.ScrapStatus.AVAILABLE
+        assert float(scrap.weight_kg) == 2.450
         
         # Verify scrap_sold audit log is created
         assert AuditLog.objects.filter(
             action=AuditLog.ActionType.SCRAP_SOLD,
             username="John Employee"
         ).exists()
+
+        # 3. Try to sell more than the remaining weight (3.000 kg > 2.450 kg) - should fail
+        invalid_sale_payload = {
+            "scrap": scrap_id,
+            "quantity_sold": 3.000,
+            "sale_price_per_kg": 100.00
+        }
+        invalid_response = authenticated_client.post(sale_url, invalid_sale_payload, format="json")
+        assert invalid_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "quantity_sold" in invalid_response.data
+
+        # 4. Sell the rest (2.450 kg) - should succeed and mark status as SOLD
+        final_sale_payload = {
+            "scrap": scrap_id,
+            "quantity_sold": 2.450,
+            "sale_price_per_kg": 100.00
+        }
+        final_response = authenticated_client.post(sale_url, final_sale_payload, format="json")
+        assert final_response.status_code == status.HTTP_201_CREATED
+
+        scrap = Scrap.objects.get(id=scrap_id)
+        assert scrap.status == Scrap.ScrapStatus.SOLD
+        assert float(scrap.weight_kg) == 0.000
 
 
 @pytest.mark.django_db

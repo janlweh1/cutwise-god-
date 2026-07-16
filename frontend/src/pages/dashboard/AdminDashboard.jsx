@@ -9,7 +9,7 @@ import ScrapView from "./views/ScrapView";
 import ConfigurationView from "./views/ConfigurationView";
 import api from "../../lib/api";
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import "../../styles/dashboard.css";
 
@@ -24,10 +24,6 @@ const MATERIAL_TYPE_LABELS = {
   suede: "Suede",
   nappa: "Nappa Leather",
   synthetic: "Synthetic Leather",
-  rubber: "Rubber",
-  thread: "Thread",
-  adhesive: "Adhesive",
-  accessory: "Accessory",
   other: "Other",
 };
 
@@ -135,9 +131,9 @@ const getActivityInfo = (log) => {
   return map[log.action] || { label: "Activity", className: "inventory" };
 };
 
-/* ── Custom Tooltip for Pie Chart ────────────── */
+/* ── Custom Tooltip for Bar Chart ────────────── */
 
-const CustomPieTooltip = ({ active, payload }) => {
+const CustomBarTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const entry = payload[0];
     return (
@@ -150,7 +146,7 @@ const CustomPieTooltip = ({ active, payload }) => {
         fontSize: "0.8rem",
       }}>
         <p style={{ fontWeight: 600, marginBottom: "0.25rem", color: "var(--text-dark)" }}>{entry.name}</p>
-        <p style={{ color: entry.payload.fill, margin: 0 }}>
+        <p style={{ color: entry.color || entry.payload.fill || "var(--primary)", margin: 0, fontWeight: 600 }}>
           {entry.value} unit{entry.value !== 1 ? "s" : ""}
         </p>
       </div>
@@ -305,33 +301,31 @@ const HomeView = () => {
                 <div className="view-empty" style={{ padding: "2rem" }}>No materials in inventory yet.</div>
               ) : (
                 <>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={donutData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                        dataKey="value"
-                        stroke="none"
-                      >
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={donutData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                        axisLine={{ stroke: "#E5E7EB" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0, 0, 0, 0.04)" }} />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={28}>
                         {donutData.map((_, idx) => (
                           <Cell key={idx} fill={DONUT_COLORS[idx % DONUT_COLORS.length]} />
                         ))}
-                      </Pie>
-                      <Tooltip content={<CustomPieTooltip />} />
-                    </PieChart>
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
-                  <div className="donut-legend">
-                    {donutData.map((entry, idx) => (
-                      <div key={entry.name} className="donut-legend-item">
-                        <span className="donut-legend-dot" style={{ backgroundColor: DONUT_COLORS[idx % DONUT_COLORS.length] }} />
-                        {entry.name}
-                      </div>
-                    ))}
-                  </div>
                 </>
               )}
             </div>

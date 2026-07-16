@@ -1,13 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../../../lib/api";
+import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js";
 
 const emptyForm = {
   name: "",
   contact_person: "",
   phone: "",
   email: "",
-  address: "",
 };
+
+const COUNTRY_CODES = [
+  { code: "+63", country: "PH", name: "Philippines (+63)" },
+  { code: "+1", country: "US", name: "USA/Canada (+1)" },
+  { code: "+65", country: "SG", name: "Singapore (+65)" },
+  { code: "+44", country: "GB", name: "United Kingdom (+44)" },
+  { code: "+61", country: "AU", name: "Australia (+61)" },
+  { code: "+81", country: "JP", name: "Japan (+81)" },
+  { code: "+82", country: "KR", name: "South Korea (+82)" },
+  { code: "+86", country: "CN", name: "China (+86)" },
+  { code: "+852", country: "HK", name: "Hong Kong (+852)" },
+  { code: "+971", country: "AE", name: "UAE (+971)" },
+  { code: "+91", country: "IN", name: "India (+91)" },
+  { code: "+886", country: "TW", name: "Taiwan (+886)" }
+];
 
 /* ── Icon helpers ────────────────────────────── */
 const EditIcon = () => (
@@ -33,6 +48,8 @@ export const SupplierView = () => {
   const [editTarget, setEditTarget]     = useState(null);   // supplier being edited
   const [deleteTarget, setDeleteTarget] = useState(null);   // supplier pending delete confirm
   const [form, setForm]                 = useState(emptyForm);
+  const [phoneCode, setPhoneCode]       = useState("+63");
+  const [phoneNumber, setPhoneNumber]   = useState("");
   const [errors, setErrors]             = useState({});
   const [submitting, setSubmitting]     = useState(false);
   const [deleting, setDeleting]         = useState(false);
@@ -64,6 +81,8 @@ export const SupplierView = () => {
   const openAddModal = () => {
     setEditTarget(null);
     setForm(emptyForm);
+    setPhoneCode("+63");
+    setPhoneNumber("");
     setErrors({});
     setShowModal(true);
   };
@@ -75,8 +94,18 @@ export const SupplierView = () => {
       contact_person: supplier.contact_person || "",
       phone:          supplier.phone || "",
       email:          supplier.email || "",
-      address:        supplier.address || "",
     });
+
+    const phoneStr = supplier.phone || "";
+    const match = phoneStr.match(/^(\+\d+)\s*(.*)$/);
+    if (match) {
+      setPhoneCode(match[1]);
+      setPhoneNumber(match[2]);
+    } else {
+      setPhoneCode("+63");
+      setPhoneNumber(phoneStr);
+    }
+
     setErrors({});
     setShowModal(true);
   };
@@ -92,9 +121,61 @@ export const SupplierView = () => {
     if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: null });
   };
 
+  const handlePhoneCodeChange = (e) => {
+    const code = e.target.value;
+    setPhoneCode(code);
+    const config = COUNTRY_CODES.find((c) => c.code === code);
+    const country = config ? config.country : undefined;
+
+    const cleaned = phoneNumber.replace(/\D/g, "");
+    const formatted = new AsYouType(country).input(cleaned);
+    setPhoneNumber(formatted);
+
+    const fullPhone = `${code} ${formatted}`;
+    setForm((prev) => ({ ...prev, phone: fullPhone }));
+    if (errors.phone) setErrors((prev) => ({ ...prev, phone: null }));
+  };
+
+  const handlePhoneNumberChange = (e) => {
+    const value = e.target.value;
+    const cleaned = value.replace(/\D/g, "");
+
+    const config = COUNTRY_CODES.find((c) => c.code === phoneCode);
+    const country = config ? config.country : undefined;
+
+    const formatted = new AsYouType(country).input(cleaned);
+    setPhoneNumber(formatted);
+
+    const fullPhone = `${phoneCode} ${formatted}`;
+    setForm((prev) => ({ ...prev, phone: fullPhone }));
+    if (errors.phone) setErrors((prev) => ({ ...prev, phone: null }));
+  };
+
   const validate = () => {
     const errs = {};
     if (!form.name.trim()) errs.name = "Supplier name is required.";
+    if (!form.contact_person.trim()) errs.contact_person = "Contact person is required.";
+
+    const phoneStr = phoneNumber.trim();
+    if (!phoneStr) {
+      errs.phone = "Phone number is required.";
+    } else {
+      const config = COUNTRY_CODES.find((c) => c.code === phoneCode);
+      const country = config ? config.country : undefined;
+      const fullPhone = `${phoneCode} ${phoneNumber}`;
+
+      const parsed = parsePhoneNumberFromString(fullPhone, country);
+      if (!parsed || !parsed.isValid()) {
+        errs.phone = "Invalid international phone number structure or digit count.";
+      }
+    }
+
+    if (!form.email.trim()) {
+      errs.email = "Email is required.";
+    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
+      errs.email = "Invalid email address.";
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -108,7 +189,6 @@ export const SupplierView = () => {
       contact_person: form.contact_person.trim(),
       phone:          form.phone.trim(),
       email:          form.email.trim(),
-      address:        form.address.trim(),
     };
     try {
       if (editTarget) {
@@ -122,7 +202,7 @@ export const SupplierView = () => {
       fetchSuppliers();
     } catch (err) {
       const data = err.response?.data;
-      if (typeof data === "object") {
+      if (data && typeof data === "object") {
         const fieldErrs = {};
         for (const [key, val] of Object.entries(data)) {
           fieldErrs[key] = Array.isArray(val) ? val.join(" ") : String(val);
@@ -260,22 +340,64 @@ export const SupplierView = () => {
               </div>
               <div className="form-row-2">
                 <div className="form-group">
-                  <label>Contact Person</label>
-                  <input name="contact_person" value={form.contact_person} onChange={handleChange} />
+                  <label>Contact Person *</label>
+                  <input
+                    name="contact_person"
+                    id="supplier-contact-input"
+                    value={form.contact_person}
+                    onChange={handleChange}
+                    placeholder="e.g., John Doe"
+                  />
+                  {errors.contact_person && <span className="form-error">{errors.contact_person}</span>}
                 </div>
                 <div className="form-group">
-                  <label>Phone</label>
-                  <input name="phone" value={form.phone} onChange={handleChange} placeholder="+63..." />
+                  <label>Phone *</label>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <select
+                      id="supplier-phone-code-select"
+                      value={phoneCode}
+                      onChange={handlePhoneCodeChange}
+                      style={{
+                        width: "90px",
+                        padding: "0.5rem 0.75rem",
+                        border: "1px solid var(--border-color)",
+                        borderRadius: "8px",
+                        background: "#fff",
+                        color: "var(--text-dark)",
+                        fontWeight: 600,
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.country})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      id="supplier-phone-input"
+                      value={phoneNumber}
+                      onChange={handlePhoneNumberChange}
+                      placeholder=""
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                  {errors.phone && <span className="form-error">{errors.phone}</span>}
                 </div>
               </div>
               <div className="form-group">
-                <label>Email</label>
-                <input name="email" type="email" value={form.email} onChange={handleChange} />
+                <label>Email *</label>
+                <input
+                  name="email"
+                  id="supplier-email-input"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="e.g., info@supplier.com"
+                />
                 {errors.email && <span className="form-error">{errors.email}</span>}
-              </div>
-              <div className="form-group">
-                <label>Address</label>
-                <textarea name="address" value={form.address} onChange={handleChange} rows="2" />
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancel</button>

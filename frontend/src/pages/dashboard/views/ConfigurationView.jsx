@@ -221,7 +221,6 @@ const UserManagementTab = ({ currentUserId }) => {
             <thead>
               <tr>
                 <th>Full Name</th>
-                <th>Username</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -233,7 +232,6 @@ const UserManagementTab = ({ currentUserId }) => {
               {users.map((u) => (
                 <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
                   <td className="td-bold">{u.full_name || "—"}</td>
-                  <td style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{u.username}</td>
                   <td style={{ fontSize: "0.82rem" }}>{u.email}</td>
                   <td><RoleBadge role={u.role} display={u.role_display} /></td>
                   <td>

@@ -218,6 +218,32 @@ class ScrapViewSet(viewsets.ModelViewSet):
         status_filter = self.request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
+
+        # Date-time range filtering for report generation
+        date_from = self.request.query_params.get("date_from")
+        date_to   = self.request.query_params.get("date_to")
+        time_from = self.request.query_params.get("time_from")
+        time_to   = self.request.query_params.get("time_to")
+        if date_from:
+            dt_from = f"{date_from} {time_from or '00:00:00'}"
+            try:
+                from django.utils.dateparse import parse_datetime
+                from django.utils import timezone
+                dt = parse_datetime(dt_from.replace(' ', 'T'))
+                if dt:
+                    qs = qs.filter(recorded_date__gte=timezone.make_aware(dt) if timezone.is_naive(dt) else dt)
+            except Exception:
+                qs = qs.filter(recorded_date__date__gte=date_from)
+        if date_to:
+            dt_to = f"{date_to} {time_to or '23:59:59'}"
+            try:
+                from django.utils.dateparse import parse_datetime
+                from django.utils import timezone
+                dt = parse_datetime(dt_to.replace(' ', 'T'))
+                if dt:
+                    qs = qs.filter(recorded_date__lte=timezone.make_aware(dt) if timezone.is_naive(dt) else dt)
+            except Exception:
+                qs = qs.filter(recorded_date__date__lte=date_to)
         return qs
 
     def perform_create(self, serializer):
@@ -245,15 +271,10 @@ class ScrapSaleViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save(sold_by=self.request.user)
 
-        # Mark the scrap as sold
-        scrap = instance.scrap
-        scrap.status = Scrap.ScrapStatus.SOLD
-        scrap.save(update_fields=["status"])
-
         log_action(
             self.request.user,
             AuditLog.ActionType.SCRAP_SOLD,
-            f"Sold scrap from {scrap.material.material_name} — {instance.quantity_sold} kg @ ₱{instance.sale_price_per_kg}/kg — Total: ₱{instance.total_amount}",
+            f"Sold scrap from {instance.scrap.material.material_name} — {instance.quantity_sold} kg @ ₱{instance.sale_price_per_kg}/kg — Total: ₱{instance.total_amount}",
         )
 
 
@@ -292,12 +313,44 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         if action:
             queryset = queryset.filter(action=action)
 
-        # Filter by date (exact match of date part YYYY-MM-DD)
+        # Filter by single date (exact match of date part YYYY-MM-DD)
         date_str = self.request.query_params.get("date")
         if date_str:
             try:
                 queryset = queryset.filter(timestamp__date=date_str)
             except ValueError:
                 pass
+
+        # Date-time range filtering for report generation
+        date_from = self.request.query_params.get("date_from")
+        date_to   = self.request.query_params.get("date_to")
+        time_from = self.request.query_params.get("time_from")
+        time_to   = self.request.query_params.get("time_to")
+
+        if date_from:
+            dt_from_str = f"{date_from}T{time_from or '00:00:00'}"
+            try:
+                from django.utils.dateparse import parse_datetime
+                from django.utils import timezone as tz
+                dt = parse_datetime(dt_from_str)
+                if dt:
+                    if tz.is_naive(dt):
+                        dt = tz.make_aware(dt)
+                    queryset = queryset.filter(timestamp__gte=dt)
+            except Exception:
+                queryset = queryset.filter(timestamp__date__gte=date_from)
+
+        if date_to:
+            dt_to_str = f"{date_to}T{time_to or '23:59:59'}"
+            try:
+                from django.utils.dateparse import parse_datetime
+                from django.utils import timezone as tz
+                dt = parse_datetime(dt_to_str)
+                if dt:
+                    if tz.is_naive(dt):
+                        dt = tz.make_aware(dt)
+                    queryset = queryset.filter(timestamp__lte=dt)
+            except Exception:
+                queryset = queryset.filter(timestamp__date__lte=date_to)
 
         return queryset

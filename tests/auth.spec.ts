@@ -7,7 +7,6 @@ const BASE_URL = 'http://localhost:5173';
 // ─────────────────────────────────────────────────────────────
 async function loginAsClerk(page: Page) {
   await page.goto(BASE_URL);
-  await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
   await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
   await page.getByRole('textbox', { name: 'Password' }).fill('password123');
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -24,7 +23,6 @@ test.describe('Authentication', () => {
 
     test('should allow Inventory Clerk to log in with valid credentials', async ({ page }) => {
       await page.goto(BASE_URL);
-      await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
       await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
       await page.getByRole('textbox', { name: 'Password' }).fill('password123');
       await page.getByRole('button', { name: 'Sign In' }).click();
@@ -45,15 +43,15 @@ test.describe('Authentication', () => {
       await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
     });
 
-    test('should log out and return to role selection page', async ({ page }) => {
+    test('should log out and return to login page', async ({ page }) => {
       await loginAsClerk(page);
 
       await page.getByRole('button', { name: 'Sign Out' }).click();
 
-      // Should be back at role selection (root URL)
+      // Should be back at login page (root URL)
       await expect(page).toHaveURL(BASE_URL + '/');
-      // Role select buttons should be visible again
-      await expect(page.getByRole('button', { name: 'Select Inventory Clerk role' })).toBeVisible();
+      // Sign In button should be visible again
+      await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
     });
 
   });
@@ -63,7 +61,6 @@ test.describe('Authentication', () => {
 
     test('should show error when password is incorrect', async ({ page }) => {
       await page.goto(BASE_URL);
-      await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
       await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
       await page.getByRole('textbox', { name: 'Password' }).fill('wrongpassword123');
       await page.getByRole('button', { name: 'Sign In' }).click();
@@ -76,7 +73,6 @@ test.describe('Authentication', () => {
 
     test('should show error when both fields are empty', async ({ page }) => {
       await page.goto(BASE_URL);
-      await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
 
       // Click Sign In without filling anything
       await page.getByRole('button', { name: 'Sign In' }).click();
@@ -84,19 +80,6 @@ test.describe('Authentication', () => {
       // Should show "Please fill in all fields" error
       await expect(page.getByRole('alert')).toBeVisible();
       await expect(page.getByRole('alert')).toContainText('Please fill in all fields');
-    });
-
-    test('should deny access when account role does not match selected role', async ({ page }) => {
-      // Navigate directly to admin login, but use inventory clerk credentials
-      await page.goto(`${BASE_URL}/login?role=admin`);
-      await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
-      await page.getByRole('textbox', { name: 'Password' }).fill('password123');
-      await page.getByRole('button', { name: 'Sign In' }).click();
-
-      // Should show Access Denied error — clerk cannot log in as admin
-      await expect(page.getByRole('alert')).toBeVisible();
-      await expect(page.getByRole('alert')).toContainText('Access Denied');
-      await expect(page).not.toHaveURL(/dashboard/);
     });
 
   });

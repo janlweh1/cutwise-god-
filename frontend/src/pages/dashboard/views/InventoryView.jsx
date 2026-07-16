@@ -20,10 +20,6 @@ const MATERIAL_TYPES = [
   { value: "suede", label: "Suede" },
   { value: "nappa", label: "Nappa Leather" },
   { value: "synthetic", label: "Synthetic Leather" },
-  { value: "rubber", label: "Rubber" },
-  { value: "thread", label: "Thread" },
-  { value: "adhesive", label: "Adhesive" },
-  { value: "accessory", label: "Accessory" },
   { value: "custom", label: "Custom" },
 ];
 
@@ -37,7 +33,6 @@ const emptyForm = {
   quantity: "",
   unit_cost: "",
   supplier: "",
-  min_stock: "10",
 };
 
 export const InventoryView = () => {
@@ -119,7 +114,6 @@ export const InventoryView = () => {
       quantity: String(mat.quantity),
       unit_cost: String(mat.unit_cost),
       supplier: mat.supplier || "",
-      min_stock: String(mat.min_stock),
     });
     setEditingId(mat.id);
     setErrors({});
@@ -150,8 +144,6 @@ export const InventoryView = () => {
     if (!form.quantity || Number(form.quantity) < 0) errs.quantity = "Valid quantity is required.";
     if (!form.unit_cost || Number(form.unit_cost) < 0) errs.unit_cost = "Valid unit cost is required.";
     if (!form.supplier) errs.supplier = "Supplier is required.";
-    if (form.min_stock === "" || form.min_stock === null) errs.min_stock = "Reorder level is required.";
-    else if (Number(form.min_stock) < 0)         errs.min_stock = "Reorder level cannot be negative.";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -171,7 +163,6 @@ export const InventoryView = () => {
         quantity: Number(form.quantity),
         unit_cost: Number(form.unit_cost),
         supplier: form.supplier || null,
-        min_stock: Number(form.min_stock) || 10,
       };
       if (editingId) {
         await api.patch(`/inventory/materials/${editingId}/`, payload);
@@ -393,30 +384,15 @@ export const InventoryView = () => {
                 </div>
               </div>
 
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>Supplier *</label>
-                  <select name="supplier" value={form.supplier} onChange={handleChange}>
-                    <option value="">— Select Supplier —</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                  {errors.supplier && <span className="form-error">{errors.supplier}</span>}
-                </div>
-                <div className="form-group">
-                  <label>Reorder Level *</label>
-                  <input
-                    name="min_stock"
-                    type="number"
-                    min="0"
-                    value={form.min_stock}
-                    onChange={handleChange}
-                    onKeyDown={(e) => e.key === "-" && e.preventDefault()}
-                    style={{ borderColor: errors.min_stock ? "#EF4444" : undefined }}
-                  />
-                  {errors.min_stock && <span className="form-error">{errors.min_stock}</span>}
-                </div>
+              <div className="form-group">
+                <label>Supplier *</label>
+                <select name="supplier" value={form.supplier} onChange={handleChange}>
+                  <option value="">— Select Supplier —</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                {errors.supplier && <span className="form-error">{errors.supplier}</span>}
               </div>
 
               <div className="modal-actions">

@@ -7,7 +7,6 @@ const BASE_URL = 'http://localhost:5173';
 // ─────────────────────────────────────────────────────────────
 async function goToInventory(page: Page) {
   await page.goto(BASE_URL);
-  await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
   await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
   await page.getByRole('textbox', { name: 'Password' }).fill('password123');
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -42,7 +41,7 @@ test.describe('Inventory Management', () => {
 
       // Fill in the form
       await page.getByRole('textbox', { name: 'e.g., Full Grain Cowhide' }).fill(uniqueName);
-      await page.locator('select[name="material_type"]').selectOption('adhesive');
+      await page.locator('select[name="material_type"]').selectOption('suede');
       await page.getByPlaceholder('e.g., 12').fill('10');
       await page.locator('input[name="quantity"]').fill('50');
       await page.locator('input[name="unit_cost"]').fill('150');
@@ -63,7 +62,7 @@ test.describe('Inventory Management', () => {
       const uniqueName = `Edit Test ${Date.now()}`;
       await page.getByRole('button', { name: 'Add Material' }).click();
       await page.getByRole('textbox', { name: 'e.g., Full Grain Cowhide' }).fill(uniqueName);
-      await page.locator('select[name="material_type"]').selectOption('rubber');
+      await page.locator('select[name="material_type"]').selectOption('goatskin');
       await page.locator('input[name="quantity"]').fill('30');
       await page.locator('input[name="unit_cost"]').fill('100');
       await page.locator('select[name="supplier"]').selectOption({ index: 1 });
@@ -92,7 +91,7 @@ test.describe('Inventory Management', () => {
       const uniqueName = `Delete Test ${Date.now()}`;
       await page.getByRole('button', { name: 'Add Material' }).click();
       await page.getByRole('textbox', { name: 'e.g., Full Grain Cowhide' }).fill(uniqueName);
-      await page.locator('select[name="material_type"]').selectOption('thread');
+      await page.locator('select[name="material_type"]').selectOption('sheepskin');
       await page.locator('input[name="quantity"]').fill('10');
       await page.locator('input[name="unit_cost"]').fill('50');
       await page.locator('select[name="supplier"]').selectOption({ index: 1 });

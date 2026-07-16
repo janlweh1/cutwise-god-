@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import api from "../../../lib/api";
 import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -10,14 +10,14 @@ import * as XLSX from "xlsx";
 /* ── Constants ───────────────────────────────── */
 
 const ACTION_COLORS = {
-  material_added:   "#059669",
+  material_added: "#059669",
   material_updated: "#2563EB",
   material_deleted: "#DC2626",
-  scrap_recorded:   "#D97706",
-  scrap_sold:       "#7C3AED",
-  stock_adjusted:   "#0891B2",
-  supplier_added:   "#059669",
-  config_updated:   "#111827",
+  scrap_recorded: "#D97706",
+  scrap_sold: "#7C3AED",
+  stock_adjusted: "#0891B2",
+  supplier_added: "#059669",
+  config_updated: "#111827",
 };
 
 const CHART_COLORS = [
@@ -29,8 +29,7 @@ const CHART_COLORS = [
 const MATERIAL_TYPE_LABELS = {
   cowhide: "Cowhide", goatskin: "Goatskin", sheepskin: "Sheepskin",
   suede: "Suede", nappa: "Nappa Leather", synthetic: "Synthetic Leather",
-  rubber: "Rubber", thread: "Thread", adhesive: "Adhesive",
-  accessory: "Accessory", other: "Other",
+  other: "Other",
 };
 
 const fmt = (n, dec = 2) =>
@@ -41,18 +40,19 @@ const fmt = (n, dec = 2) =>
 
 /* ── Excel Report Generator ──────────────────── */
 
-const generateExcel = ({ materials, suppliers, scraps, dateFrom, dateTo }) => {
+const generateExcel = ({ materials, suppliers, scraps, dateFrom, dateTo, timeFrom, timeTo }) => {
   const wb = XLSX.utils.book_new();
 
-  const rangeLabel = dateFrom || dateTo
-    ? `${dateFrom || "All"} to ${dateTo || "All"}`
+  const fromLabel = dateFrom ? `${dateFrom}${timeFrom ? " " + timeFrom : ""}` : "All";
+  const toLabel   = dateTo   ? `${dateTo}${timeTo   ? " " + timeTo   : ""}` : "All";
+  const rangeLabel = (dateFrom || dateTo || timeFrom || timeTo)
+    ? `${fromLabel} → ${toLabel}`
     : "All Dates";
 
   const MATERIAL_TYPE_LABELS_LOCAL = {
     cowhide: "Cowhide", goatskin: "Goatskin", sheepskin: "Sheepskin",
     suede: "Suede", nappa: "Nappa Leather", synthetic: "Synthetic Leather",
-    rubber: "Rubber", thread: "Thread", adhesive: "Adhesive",
-    accessory: "Accessory", other: "Other",
+    other: "Other",
   };
 
   /* Sheet 1 – Raw Materials (all) */
@@ -71,7 +71,7 @@ const generateExcel = ({ materials, suppliers, scraps, dateFrom, dateTo }) => {
       m.min_stock,
       m.stock_status === "in_stock" ? "In Stock"
         : m.stock_status === "low_stock" ? "Low Stock"
-        : "Out of Stock",
+          : "Out of Stock",
     ]),
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(matData);
@@ -137,7 +137,7 @@ const generateExcel = ({ materials, suppliers, scraps, dateFrom, dateTo }) => {
 
 /* ── PDF Report Generator ───────────────────── */
 
-const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, dateTo }) => {
+const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, dateTo, timeFrom, timeTo }) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 16;
@@ -169,16 +169,18 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, d
     doc.setFont("helvetica", "italic");
     doc.setFontSize(8.5);
     doc.setTextColor(230, 210, 210);
-    const rangeLabel = `Data range: ${dateFrom || "All"} → ${dateTo || "All"}`;
+    const fromLabel = dateFrom ? `${dateFrom}${timeFrom ? " " + timeFrom : ""}` : "All";
+    const toLabel   = dateTo   ? `${dateTo}${timeTo   ? " " + timeTo   : ""}` : "All";
+    const rangeLabel = `Data range: ${fromLabel} → ${toLabel}`;
     doc.text(rangeLabel, margin, 28);
   }
 
   y = 42;
 
   /* ── Computed summary figures ── */
-  const totalQty   = materials.reduce((s, m) => s + m.quantity, 0);
+  const totalQty = materials.reduce((s, m) => s + m.quantity, 0);
   const totalValue = materials.reduce((s, m) => s + Number(m.total_value || 0), 0);
-  const lowStock   = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
+  const lowStock = materials.filter(m => m.stock_status === "low_stock" || m.stock_status === "out_of_stock");
   const availScrap = scraps.filter(s => s.status === "available");
   const totalScrapKg = availScrap.reduce((s, sc) => s + Number(sc.weight_kg), 0);
 
@@ -193,12 +195,12 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, d
   y += 8;
 
   const summaryCards = [
-    { label: "Total Raw Materials",    value: totalQty.toLocaleString() + " units" },
+    { label: "Total Raw Materials", value: totalQty.toLocaleString() + " units" },
     { label: "Overall Inventory Value", value: "₱" + fmt(totalValue) },
-    { label: "Available Scrap Weight",  value: totalScrapKg.toFixed(3) + " kg" },
-    { label: "Active Suppliers",        value: suppliers.length.toString() },
-    { label: "Low Stock Alerts",        value: lowStock.length.toString() },
-    { label: "Total Materials Types",   value: [...new Set(materials.map(m => m.material_type))].length.toString() },
+    { label: "Available Scrap Weight", value: totalScrapKg.toFixed(3) + " kg" },
+    { label: "Active Suppliers", value: suppliers.length.toString() },
+    { label: "Low Stock Alerts", value: lowStock.length.toString() },
+    { label: "Total Materials Types", value: [...new Set(materials.map(m => m.material_type))].length.toString() },
   ];
 
   const cardCols = 3;
@@ -343,7 +345,7 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, d
       fmt(m.total_value),
       m.stock_status === "in_stock" ? "In Stock"
         : m.stock_status === "low_stock" ? "Low Stock"
-        : "Out of Stock",
+          : "Out of Stock",
     ]),
     headStyles: {
       fillColor: [30, 30, 30],
@@ -463,9 +465,9 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, d
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, ph - 5, { align: "right" });
   }
 
-  /* ── Save ── */
-  const filename = `CUTWISE_Report_${now.toISOString().slice(0, 10)}.pdf`;
-  doc.save(filename);
+  /* ── Return blob URL to caller ── */
+  const blobUrl = doc.output("bloburl");
+  return blobUrl;
 };
 
 /* ══════════════════════════════════════════════
@@ -473,19 +475,19 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, d
    ══════════════════════════════════════════════ */
 
 export const ReportsView = () => {
-  const [logs, setLogs]               = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState("");
-  const [userFilter, setUserFilter]   = useState("");
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
-  const [dateFilter, setDateFilter]   = useState("");
-  const [allUsers, setAllUsers]       = useState([]);
-  const [generating, setGenerating]   = useState(false);
-  const [page, setPage]               = useState(1);
-  const [totalCount, setTotalCount]   = useState(0);
+  const [dateFilter, setDateFilter] = useState("");
+  const [allUsers, setAllUsers] = useState([]);
+  const [generating, setGenerating] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Report data — fetched lazily when generating
-  const [reportData, setReportData]   = useState(null);
+  const [reportData, setReportData] = useState(null);
   const chartRef = useRef(null);
 
   /* ── Reset page on filter changes ── */
@@ -513,10 +515,10 @@ export const ReportsView = () => {
     setLoading(true);
     try {
       const params = { page };
-      if (search)       params.search   = search;
-      if (userFilter)   params.username = userFilter;
-      if (actionFilter) params.action   = actionFilter;
-      if (dateFilter)   params.date     = dateFilter;
+      if (search) params.search = search;
+      if (userFilter) params.username = userFilter;
+      if (actionFilter) params.action = actionFilter;
+      if (dateFilter) params.date = dateFilter;
       const res = await api.get("/inventory/logs/", { params });
       if (res.data.results) {
         setLogs(res.data.results);
@@ -534,41 +536,65 @@ export const ReportsView = () => {
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
-  const [reportDate, setReportDate]         = useState("");
+  const [reportDateFrom, setReportDateFrom] = useState("");
+  const [reportDateTo,   setReportDateTo]   = useState("");
+  const [reportTimeFrom, setReportTimeFrom] = useState("");
+  const [reportTimeTo,   setReportTimeTo]   = useState("");
   const [generatingExcel, setGeneratingExcel] = useState(false);
 
   /* ── Fetch all report data + generate PDF ── */
   const buildReportParams = () => {
     const p = {};
-    if (reportDate) { p.date_from = reportDate; p.date_to = reportDate; }
+    if (reportDateFrom) p.date_from = reportDateFrom;
+    if (reportDateTo)   p.date_to   = reportDateTo;
+    if (reportTimeFrom) p.time_from = reportTimeFrom;
+    if (reportTimeTo)   p.time_to   = reportTimeTo;
     return p;
   };
 
   const handleGenerateReport = async () => {
     setGenerating(true);
+    // Open the tab immediately (synchronous) so popup blockers don't block it
+    const previewTab = window.open("", "_blank");
+    if (previewTab) {
+      previewTab.document.write(
+        "<html><head><title>Generating Report…</title></head><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f9fafb'>" +
+        "<p style='color:#6b7280;font-size:1.1rem'>⏳ Generating your report, please wait…</p></body></html>"
+      );
+    }
     try {
       const params = buildReportParams();
       const [resMat, resSuppliers, resScraps] = await Promise.all([
         api.get("/inventory/materials/", { params }),
         api.get("/inventory/suppliers/"),
-        api.get("/inventory/scrap/"),
+        api.get("/inventory/scrap/", { params }),
       ]);
-      const materials  = resMat.data.results      || resMat.data;
-      const suppliers  = resSuppliers.data.results || resSuppliers.data;
-      const scraps     = resScraps.data.results    || resScraps.data;
+      const materials = resMat.data.results || resMat.data;
+      const suppliers = resSuppliers.data.results || resSuppliers.data;
+      const scraps = resScraps.data.results || resScraps.data;
 
       setReportData({ materials, suppliers, scraps });
 
-      // Wait one tick for the hidden chart to render, then generate PDF
       setTimeout(async () => {
-      await generatePDF({ materials, suppliers, scraps, chartRef, dateFrom: reportDate, dateTo: reportDate });
+        const blobUrl = await generatePDF({
+          materials, suppliers, scraps, chartRef,
+          dateFrom: reportDateFrom, dateTo: reportDateTo,
+          timeFrom: reportTimeFrom, timeTo: reportTimeTo,
+        });
+        if (previewTab && blobUrl) {
+          previewTab.location.href = blobUrl;
+        } else if (blobUrl) {
+          window.open(blobUrl, "_blank");
+        }
         setGenerating(false);
       }, 600);
     } catch (err) {
       console.error("Failed to generate report:", err);
+      if (previewTab) previewTab.close();
       setGenerating(false);
     }
   };
+
 
   const handleGenerateExcel = async () => {
     setGeneratingExcel(true);
@@ -577,12 +603,16 @@ export const ReportsView = () => {
       const [resMat, resSuppliers, resScraps] = await Promise.all([
         api.get("/inventory/materials/", { params }),
         api.get("/inventory/suppliers/"),
-        api.get("/inventory/scrap/"),
+        api.get("/inventory/scrap/", { params }),
       ]);
-      const materials  = resMat.data.results      || resMat.data;
-      const suppliers  = resSuppliers.data.results || resSuppliers.data;
-      const scraps     = resScraps.data.results    || resScraps.data;
-      generateExcel({ materials, suppliers, scraps, dateFrom: reportDate, dateTo: reportDate });
+      const materials = resMat.data.results || resMat.data;
+      const suppliers = resSuppliers.data.results || resSuppliers.data;
+      const scraps = resScraps.data.results || resScraps.data;
+      generateExcel({
+        materials, suppliers, scraps,
+        dateFrom: reportDateFrom, dateTo: reportDateTo,
+        timeFrom: reportTimeFrom, timeTo: reportTimeTo,
+      });
     } catch (err) {
       console.error("Failed to generate Excel:", err);
     } finally {
@@ -593,15 +623,15 @@ export const ReportsView = () => {
   /* ── Build donut data for the hidden chart ── */
   const donutData = reportData
     ? Object.entries(
-        reportData.materials.reduce((acc, m) => {
-          const label = MATERIAL_TYPE_LABELS[m.material_type] || m.material_type || "Other";
-          acc[label] = (acc[label] || 0) + m.quantity;
-          return acc;
-        }, {})
-      )
-        .map(([name, value]) => ({ name, value }))
-        .filter(d => d.value > 0)
-        .sort((a, b) => b.value - a.value)
+      reportData.materials.reduce((acc, m) => {
+        const label = MATERIAL_TYPE_LABELS[m.material_type] || m.material_type || "Other";
+        acc[label] = (acc[label] || 0) + m.quantity;
+        return acc;
+      }, {})
+    )
+      .map(([name, value]) => ({ name, value }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value)
     : [];
 
   return (
@@ -611,28 +641,6 @@ export const ReportsView = () => {
       <div className="view-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
         <h2 className="view-title">Audit Logs</h2>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          {/* Report date picker */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>
-            <span>Report date:</span>
-            <input
-              type="date"
-              id="report-date"
-              className="filter-input"
-              style={{ padding: "0.35rem 0.6rem", fontSize: "0.8rem", width: "150px" }}
-              value={reportDate}
-              onChange={(e) => setReportDate(e.target.value)}
-            />
-            {reportDate && (
-              <button
-                className="btn btn-secondary"
-                style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem" }}
-                onClick={() => setReportDate("")}
-                title="Clear date filter"
-              >
-                ✕
-              </button>
-            )}
-          </div>
           <button
             id="generate-report-btn"
             className="btn btn-primary"
@@ -658,7 +666,7 @@ export const ReportsView = () => {
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                PDF
+                Export PDF
               </>
             )}
           </button>
@@ -688,11 +696,138 @@ export const ReportsView = () => {
                   <line x1="16" y1="13" x2="8" y2="13" />
                   <line x1="16" y1="17" x2="8" y2="17" />
                 </svg>
-                Excel
+                Export Excel
               </>
             )}
           </button>
         </div>
+      </div>
+
+      {/* ── Date-Time Range Picker Card ── */}
+      <div style={{
+        background: "linear-gradient(135deg, #7B1F1F 0%, #9B2C2C 100%)",
+        borderRadius: "12px",
+        padding: "1.25rem 1.5rem",
+        marginBottom: "1.5rem",
+        boxShadow: "0 4px 20px rgba(123,31,31,0.18)",
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "1.25rem",
+        alignItems: "flex-end",
+      }}>
+        <div style={{ flex: "0 0 auto" }}>
+          <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 700, color: "rgba(255,255,255,0.65)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+            📅 Report Date &amp; Time Range
+          </p>
+          <p style={{ margin: 0, fontSize: "0.78rem", color: "rgba(255,255,255,0.5)" }}>
+            Leave blank to export all records
+          </p>
+        </div>
+
+        {/* FROM */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", textTransform: "uppercase" }}>From</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input
+              type="date"
+              id="report-date-from"
+              value={reportDateFrom}
+              onChange={(e) => setReportDateFrom(e.target.value)}
+              style={{
+                padding: "0.45rem 0.7rem", fontSize: "0.85rem",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "8px",
+                background: "rgba(255,255,255,0.12)",
+                color: "#fff",
+                colorScheme: "dark",
+                outline: "none",
+              }}
+            />
+            <input
+              type="time"
+              id="report-time-from"
+              value={reportTimeFrom}
+              onChange={(e) => setReportTimeFrom(e.target.value)}
+              style={{
+                padding: "0.45rem 0.7rem", fontSize: "0.85rem",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "8px",
+                background: "rgba(255,255,255,0.12)",
+                color: "#fff",
+                colorScheme: "dark",
+                outline: "none",
+                width: "110px",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Arrow */}
+        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "1.2rem", paddingBottom: "0.2rem" }}>→</div>
+
+        {/* TO */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", textTransform: "uppercase" }}>To</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input
+              type="date"
+              id="report-date-to"
+              value={reportDateTo}
+              onChange={(e) => setReportDateTo(e.target.value)}
+              style={{
+                padding: "0.45rem 0.7rem", fontSize: "0.85rem",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "8px",
+                background: "rgba(255,255,255,0.12)",
+                color: "#fff",
+                colorScheme: "dark",
+                outline: "none",
+              }}
+            />
+            <input
+              type="time"
+              id="report-time-to"
+              value={reportTimeTo}
+              onChange={(e) => setReportTimeTo(e.target.value)}
+              style={{
+                padding: "0.45rem 0.7rem", fontSize: "0.85rem",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "8px",
+                background: "rgba(255,255,255,0.12)",
+                color: "#fff",
+                colorScheme: "dark",
+                outline: "none",
+                width: "110px",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Active range preview */}
+        {(reportDateFrom || reportDateTo || reportTimeFrom || reportTimeTo) && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.75rem",
+            background: "rgba(255,255,255,0.12)",
+            borderRadius: "8px", padding: "0.4rem 0.9rem",
+            border: "1px solid rgba(255,255,255,0.2)",
+          }}>
+            <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>
+              {reportDateFrom || "All"}{reportTimeFrom ? ` ${reportTimeFrom}` : ""}
+              {" → "}
+              {reportDateTo || "All"}{reportTimeTo ? ` ${reportTimeTo}` : ""}
+            </span>
+            <button
+              onClick={() => { setReportDateFrom(""); setReportDateTo(""); setReportTimeFrom(""); setReportTimeTo(""); }}
+              title="Clear date-time range"
+              style={{
+                background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%",
+                width: "20px", height: "20px", cursor: "pointer", color: "#fff",
+                fontSize: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center",
+                lineHeight: 1,
+              }}
+            >✕</button>
+          </div>
+        )}
       </div>
 
       {/* ── Filters ── */}
@@ -846,35 +981,31 @@ export const ReportsView = () => {
           aria-hidden="true"
         >
           <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={donutData}
-                cx="40%"
-                cy="50%"
-                innerRadius={70}
-                outerRadius={110}
-                paddingAngle={3}
-                dataKey="value"
-                stroke="none"
-              >
-                {donutData.map((_, idx) => (
-                  <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-                ))}
-              </Pie>
+            <BarChart
+              data={donutData}
+              margin={{ top: 15, right: 15, left: -10, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: "#6B7280", fontSize: 11 }}
+                axisLine={{ stroke: "#E5E7EB" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: "#6B7280", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
               <Tooltip
                 formatter={(value, name) => [`${value} units`, name]}
               />
-              <Legend
-                layout="vertical"
-                align="right"
-                verticalAlign="middle"
-                iconType="circle"
-                iconSize={10}
-                formatter={(val) => (
-                  <span style={{ fontSize: "12px", color: "#374151" }}>{val}</span>
-                )}
-              />
-            </PieChart>
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32}>
+                {donutData.map((_, idx) => (
+                  <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}

@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 test('test', async ({ page }) => {
   const uniqueName = `Testing Lang ${Date.now()}`; // avoids unique_together constraint on repeat runs
   await page.goto('http://localhost:5173/');
-  await page.getByRole('button', { name: 'Select Inventory Clerk role' }).click();
   await page.getByRole('textbox', { name: 'Email Address' }).click();
   await page.getByRole('textbox', { name: 'Email Address' }).fill('clerk@otto.com');
   await page.getByRole('textbox', { name: 'Email Address' }).press('Tab');
@@ -24,7 +23,7 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: 'Add Material' }).click();
   await page.getByRole('textbox', { name: 'e.g., Full Grain Cowhide' }).click();
   await page.getByRole('textbox', { name: 'e.g., Full Grain Cowhide' }).fill(uniqueName);
-  await page.locator('select[name="material_type"]').selectOption('adhesive');
+  await page.locator('select[name="material_type"]').selectOption('suede');
   await page.getByPlaceholder('e.g., 12').click();
   await page.getByPlaceholder('e.g., 12').fill('15');
   await page.locator('input[name="quantity"]').click();
