@@ -6,7 +6,9 @@ import InventoryView from "./views/InventoryView";
 import SupplierView from "./views/SupplierView";
 import ReportsView from "./views/ReportsView";
 import ScrapView from "./views/ScrapView";
+import AnalyticsView from "./views/AnalyticsView";
 import api from "../../lib/api";
+import AIAssistantFloat from "../../components/dashboard/AIAssistantFloat";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -426,6 +428,8 @@ export const SupervisorDashboard = () => {
 
   const renderView = () => {
     switch (activeNav) {
+      case "analytics":
+        return <AnalyticsView />;
       case "inventory":
         return <InventoryView />;
       case "scrap":
@@ -452,6 +456,9 @@ export const SupervisorDashboard = () => {
       <main className="dashboard-main">
         {renderView()}
       </main>
+
+      {/* AI Assistant — floating on all supervisor pages */}
+      <AIAssistantFloat />
     </div>
   );
 };

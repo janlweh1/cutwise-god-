@@ -22,3 +22,16 @@ pytest-django>=4.8,<5.0
 flake8>=7.0,<8.0
 black>=24.0,<25.0
 phonenumbers>=9.0,<10.0
+
+# Analytics & AI (Capstone 2)
+pandas>=2.0,<3.0
+scikit-learn>=1.4,<2.0
+numpy>=1.26,<3.0
+
+# Vector DB & Embeddings (Capstone 2 - Sprint 3 / Week 4)
+chromadb>=0.4,<1.0
+sentence-transformers>=2.7,<3.0
+
+# LLM Integration (Capstone 2 - AI Service)
+# Uses google-genai (new SDK, replaces deprecated google-generativeai)
+google-genai>=1.0

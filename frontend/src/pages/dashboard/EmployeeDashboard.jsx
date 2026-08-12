@@ -5,6 +5,7 @@ import InventoryView from "./views/InventoryView";
 import SupplierView from "./views/SupplierView";
 import ScrapView from "./views/ScrapView";
 import api from "../../lib/api";
+import AIAssistantFloat from "../../components/dashboard/AIAssistantFloat";
 import "../../styles/dashboard.css";
 
 const formatDate = () => {
@@ -193,6 +194,9 @@ export const EmployeeDashboard = () => {
       <main className="dashboard-main">
         {renderView()}
       </main>
+
+      {/* AI Assistant — floating on all employee pages */}
+      <AIAssistantFloat />
     </div>
   );
 };

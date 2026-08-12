@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.inventory",
     "apps.authentication",
+    "apps.analytics",
 ]
 
 MIDDLEWARE = [
@@ -94,7 +95,12 @@ else:
             default=env("DATABASE_URL", default="sqlite:///db.sqlite3"),
             conn_max_age=600,
             conn_health_checks=True,
-        )
+        ),
+        # Analytics database (SQLite) — Capstone 2 polyglot persistence
+        "analytics": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "data" / "analytics.db",
+        },
     }
 
 
