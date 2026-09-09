@@ -8,18 +8,20 @@ import AccountActivationPage from "./pages/auth/AccountActivationPage";
 import EmployeeDashboard from "./pages/dashboard/EmployeeDashboard";
 import SupervisorDashboard from "./pages/dashboard/SupervisorDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
+import ScanScrapPage from "./pages/scan/ScanScrapPage";
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public Auth Routes */}
+          {/* Public Auth & Scan Routes */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
           <Route path="/activate/:uid/:token" element={<AccountActivationPage />} />
+          <Route path="/scan/:token" element={<ScanScrapPage />} />
 
           {/* Protected Dashboards */}
           <Route 

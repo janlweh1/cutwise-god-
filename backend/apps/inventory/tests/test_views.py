@@ -297,6 +297,15 @@ class TestScrapEndpoints:
         assert scrap.status == Scrap.ScrapStatus.SOLD
         assert float(scrap.weight_kg) == 0.000
 
+    def test_claim_scrap_updates_status_and_audit_log(self, authenticated_client, material):
+        scrap = Scrap.objects.create(material=material, weight_kg=2.5, status=Scrap.ScrapStatus.AVAILABLE)
+        url = reverse("inventory:scrap-detail", kwargs={"pk": scrap.id})
+        res = authenticated_client.patch(url, {"status": "claimed"}, format="json")
+        assert res.status_code == status.HTTP_200_OK
+        scrap.refresh_from_db()
+        assert scrap.status == Scrap.ScrapStatus.CLAIMED
+        assert AuditLog.objects.filter(action=AuditLog.ActionType.SCRAP_CLAIMED).exists()
+
 
 @pytest.mark.django_db
 class TestAuditLogEndpoints:

@@ -207,6 +207,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
 class ScrapViewSet(viewsets.ModelViewSet):
     """CRUD operations for scrap inventory."""
 
+    permission_classes = [AllowAny]
     queryset = Scrap.objects.select_related("material").all()
     serializer_class = ScrapSerializer
     search_fields = ["material__material_name", "status"]
@@ -253,6 +254,22 @@ class ScrapViewSet(viewsets.ModelViewSet):
             AuditLog.ActionType.SCRAP_RECORDED,
             f"Scrap recorded from {instance.material.material_name} — {instance.weight_kg} kg",
         )
+
+    def perform_update(self, serializer):
+        prev_status = serializer.instance.status
+        instance = serializer.save()
+        if prev_status != instance.status and instance.status == Scrap.ScrapStatus.CLAIMED:
+            log_action(
+                self.request.user,
+                AuditLog.ActionType.SCRAP_CLAIMED,
+                f"Scrap claimed for production from {instance.material.material_name} — {instance.weight_kg} kg",
+            )
+        else:
+            log_action(
+                self.request.user,
+                AuditLog.ActionType.MATERIAL_UPDATED,
+                f"Updated scrap from {instance.material.material_name} — Status: {instance.status}",
+            )
 
 
 # ──────────────────────────────────────────────
@@ -317,8 +334,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         date_str = self.request.query_params.get("date")
         if date_str:
             try:
-                queryset = queryset.filter(timestamp__date=date_str)
-            except ValueError:
+                from django.db.models import Q
+                queryset = queryset.filter(Q(timestamp__date=date_str) | Q(timestamp__startswith=date_str))
+            except Exception:
                 pass
 
         # Date-time range filtering for report generation

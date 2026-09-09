@@ -135,6 +135,7 @@ class Scrap(models.Model):
 
     class ScrapStatus(models.TextChoices):
         AVAILABLE = "available", "Available"
+        CLAIMED = "claimed", "Claimed for Production"
         SOLD = "sold", "Sold"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -212,6 +213,7 @@ class AuditLog(models.Model):
         MATERIAL_UPDATED = "material_updated", "Material Updated"
         MATERIAL_DELETED = "material_deleted", "Material Deleted"
         SCRAP_RECORDED = "scrap_recorded", "Scrap Recorded"
+        SCRAP_CLAIMED = "scrap_claimed", "Scrap Claimed for Production"
         SCRAP_SOLD = "scrap_sold", "Scrap Sold"
         STOCK_ADJUSTED = "stock_adjusted", "Stock Adjusted"
         SUPPLIER_ADDED = "supplier_added", "Supplier Added"
