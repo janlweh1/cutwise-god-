@@ -1031,7 +1031,6 @@
   border-radius: 10px;
   padding: 1.5rem;
   box-shadow: var(--shadow-sm);
-  height: 100%;
 }
 
 .dashboard-card-title {
@@ -1076,3 +1075,202 @@
   text-decoration: line-through;
   color: var(--text-muted);
 }
+
+/* ═══════════════════════════════════════════════
+   Clerk Home — Greeting Banner
+   ═══════════════════════════════════════════════ */
+
+.clerk-greeting-banner {
+  background: linear-gradient(135deg, var(--primary) 0%, #9B2C2C 100%);
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 20px rgba(123, 31, 31, 0.25);
+}
+
+.clerk-greeting-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.clerk-greeting-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  backdrop-filter: blur(4px);
+}
+
+.clerk-greeting-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}
+
+.clerk-greeting-sub {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.clerk-greeting-alert {
+  color: #FEF3C7;
+  font-weight: 600;
+}
+
+.clerk-greeting-warn {
+  color: #FDE68A;
+  font-weight: 500;
+}
+
+.clerk-greeting-ok {
+  color: #A7F3D0;
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════
+   Clerk Home — Quick Actions
+   ═══════════════════════════════════════════════ */
+
+.clerk-quick-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.clerk-qa-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1.1rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+.clerk-qa-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+}
+
+.clerk-qa-btn:active {
+  transform: translateY(0);
+}
+
+.clerk-qa-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.clerk-qa-label {
+  font-size: 0.85rem;
+}
+
+/* ═══════════════════════════════════════════════
+   Clerk Home — Stock Health Bar
+   ═══════════════════════════════════════════════ */
+
+.clerk-stock-bar-wrap {
+  width: 100%;
+  height: 6px;
+  background: #E5E7EB;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.clerk-stock-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+  min-width: 4px;
+}
+
+/* ═══════════════════════════════════════════════
+   Clerk Home — Table Badge
+   ═══════════════════════════════════════════════ */
+
+.clerk-table-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* ═══════════════════════════════════════════════
+   Clerk Home — All-Clear Empty State
+   ═══════════════════════════════════════════════ */
+
+.clerk-all-clear {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.clerk-all-clear-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #D1FAE5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.clerk-all-clear-title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.clerk-all-clear-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  max-width: 320px;
+}
+

@@ -78,26 +78,44 @@ class MaterialSerializer(serializers.ModelSerializer):
 
 
 class ScrapSerializer(serializers.ModelSerializer):
-    material_name = serializers.CharField(source="material.material_name", read_only=True)
-    material_type = serializers.CharField(source="material.material_type", read_only=True)
+    recorded_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Scrap
         fields = [
             "id",
-            "material",
-            "material_name",
-            "material_type",
+            "description",
             "weight_kg",
+            "price_per_kg",
+            "recorded_by",
+            "recorded_by_name",
             "recorded_date",
             "status",
         ]
-        read_only_fields = ["id", "recorded_date"]
+        read_only_fields = ["id", "recorded_date", "recorded_by"]
+
+    def get_recorded_by_name(self, obj):
+        if not obj.recorded_by:
+            return ""
+        try:
+            return obj.recorded_by.profile.full_name or obj.recorded_by.email
+        except Exception:
+            return obj.recorded_by.email
+
+    def validate_weight_kg(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Weight must be greater than 0.")
+        return value
+
+    def validate_price_per_kg(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Price per kg must be greater than 0.")
+        return value
 
 
 class ScrapSaleSerializer(serializers.ModelSerializer):
-    scrap_material = serializers.CharField(
-        source="scrap.material.material_name", read_only=True
+    scrap_label = serializers.CharField(
+        source="scrap.description", read_only=True
     )
     sold_by_name = serializers.SerializerMethodField()
 
@@ -106,16 +124,15 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "scrap",
-            "scrap_material",
+            "scrap_label",
             "sold_by",
             "sold_by_name",
             "quantity_sold",
             "sale_price_per_kg",
             "total_amount",
             "sale_date",
-            "profit",
         ]
-        read_only_fields = ["id", "sale_date", "sold_by", "total_amount", "profit"]
+        read_only_fields = ["id", "sale_date", "sold_by", "total_amount"]
 
     def get_sold_by_name(self, obj):
         if not obj.sold_by:
@@ -131,7 +148,7 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
 
         if scrap.status == Scrap.ScrapStatus.SOLD:
             raise serializers.ValidationError(
-                {"scrap": "This scrap record has already been fully sold."}
+                {"scrap": "This scrap batch has already been fully sold."}
             )
 
         if quantity_sold <= 0:
@@ -155,12 +172,9 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
         weight = validated_data["quantity_sold"]
         price_per_kg = validated_data["sale_price_per_kg"]
         total_amount = weight * price_per_kg
-        # Profit = revenue - cost of the leather that became scrap
-        unit_cost = scrap.material.unit_cost or 0
-        profit = total_amount - (unit_cost * weight)
 
         with transaction.atomic():
-            # Lock the scrap record to prevent race conditions during concurrent requests
+            # Lock the scrap record to prevent race conditions
             scrap = Scrap.objects.select_for_update().get(pk=scrap.pk)
 
             # Re-verify weight under lock
@@ -171,7 +185,7 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
                     }
                 )
 
-            # Deduct the weight and adjust status if sold out
+            # Deduct weight and update status if fully sold
             scrap.weight_kg -= weight
             if scrap.weight_kg <= 0:
                 scrap.weight_kg = 0
@@ -181,7 +195,6 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
             return ScrapSale.objects.create(
                 **validated_data,
                 total_amount=total_amount,
-                profit=profit,
             )
 
 

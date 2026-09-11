@@ -129,8 +129,8 @@ class Material(models.Model):
 
 class Scrap(models.Model):
     """
-    Scrap leather produced from cutting operations.
-    Links to the Material it was cut from and tracks its availability for sale.
+    Scrap leather from production — fully independent of raw material inventory.
+    Clerks add batches by weight and selling price only.
     """
 
     class ScrapStatus(models.TextChoices):
@@ -138,15 +138,27 @@ class Scrap(models.Model):
         SOLD = "sold", "Sold"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    material = models.ForeignKey(
-        Material,
-        on_delete=models.CASCADE,
-        related_name="scraps",
-        help_text="The source material this scrap was cut from.",
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional label for this scrap batch (e.g. 'Cowhide offcuts').",
     )
     weight_kg = models.DecimalField(
         max_digits=10, decimal_places=3, default=0,
-        help_text="Weight of the scrap in kilograms.",
+        help_text="Weight of the scrap batch in kilograms.",
+    )
+    price_per_kg = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Selling price per kilogram set when the batch was added.",
+    )
+    recorded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scraps_recorded",
+        help_text="The user who logged this scrap batch.",
     )
     recorded_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(
@@ -159,7 +171,8 @@ class Scrap(models.Model):
         ordering = ["-recorded_date"]
 
     def __str__(self):
-        return f"Scrap from {self.material.material_name} — {self.weight_kg} kg ({self.status})"
+        label = self.description or "Scrap"
+        return f"{label} — {self.weight_kg} kg @ ₱{self.price_per_kg}/kg ({self.status})"
 
 
 # ──────────────────────────────────────────────
@@ -167,7 +180,7 @@ class Scrap(models.Model):
 # ──────────────────────────────────────────────
 
 class ScrapSale(models.Model):
-    """Records a sale transaction for scrap material."""
+    """Records a sale transaction for a scrap batch."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     scrap = models.ForeignKey(
@@ -190,7 +203,6 @@ class ScrapSale(models.Model):
     sale_price_per_kg = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     sale_date = models.DateTimeField(auto_now_add=True)
-    profit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["-sale_date"]

@@ -17,15 +17,15 @@ class MaterialAdmin(admin.ModelAdmin):
 
 @admin.register(Scrap)
 class ScrapAdmin(admin.ModelAdmin):
-    list_display = ["material", "weight_kg", "status", "recorded_date"]
+    list_display = ["description", "weight_kg", "price_per_kg", "status", "recorded_date"]
     list_filter = ["status"]
-    search_fields = ["material__material_name"]
+    search_fields = ["description"]
 
 
 @admin.register(ScrapSale)
 class ScrapSaleAdmin(admin.ModelAdmin):
     list_display = ["scrap", "quantity_sold", "sale_price_per_kg", "total_amount", "sale_date"]
-    search_fields = ["scrap__material__material_name"]
+    search_fields = ["scrap__description"]
 
 
 @admin.register(AuditLog)

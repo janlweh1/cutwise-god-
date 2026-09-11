@@ -247,11 +247,12 @@ class ScrapViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(recorded_by=self.request.user)
+        label = instance.description or "Scrap batch"
         log_action(
             self.request.user,
             AuditLog.ActionType.SCRAP_RECORDED,
-            f"Scrap recorded from {instance.material.material_name} — {instance.weight_kg} kg",
+            f"Scrap added: {label} — {instance.weight_kg} kg @ ₱{instance.price_per_kg}/kg",
         )
 
 
@@ -270,11 +271,11 @@ class ScrapSaleViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save(sold_by=self.request.user)
-
+        label = instance.scrap.description or "Scrap batch"
         log_action(
             self.request.user,
             AuditLog.ActionType.SCRAP_SOLD,
-            f"Sold scrap from {instance.scrap.material.material_name} — {instance.quantity_sold} kg @ ₱{instance.sale_price_per_kg}/kg — Total: ₱{instance.total_amount}",
+            f"Sold scrap: {label} — {instance.quantity_sold} kg @ ₱{instance.sale_price_per_kg}/kg — Total: ₱{instance.total_amount}",
         )
 
 

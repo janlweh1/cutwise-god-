@@ -40,18 +40,25 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-/* ── Record Scrap Modal ──────────────────────── */
+/* ── Add Scrap Modal ─────────────────────────── */
 
-const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
-  const [form, setForm] = useState({ material: "", weight_kg: "" });
+const QUICK_PRICES = [70, 180];
+
+const AddScrapModal = ({ onClose, onSuccess }) => {
+  const [form, setForm] = useState({ description: "", weight_kg: "", price_per_kg: "" });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
+  const weight = parseFloat(form.weight_kg) || 0;
+  const price  = parseFloat(form.price_per_kg) || 0;
+  const estRevenue = weight * price;
+
   const validate = () => {
     const errs = {};
-    if (!form.material) errs.material = "Please select a source material.";
-    if (!form.weight_kg || Number(form.weight_kg) <= 0)
+    if (!form.weight_kg || weight <= 0)
       errs.weight_kg = "Weight must be greater than 0.";
+    if (!form.price_per_kg || price <= 0)
+      errs.price_per_kg = "Price per kg must be greater than 0.";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -62,10 +69,11 @@ const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
     setSubmitting(true);
     try {
       await api.post("/inventory/scrap/", {
-        material: form.material,
-        weight_kg: Number(form.weight_kg),
+        description: form.description.trim(),
+        weight_kg: weight,
+        price_per_kg: price,
       });
-      onSuccess("Scrap recorded successfully.");
+      onSuccess("Scrap batch added successfully.");
     } catch (err) {
       const data = err.response?.data;
       if (data && typeof data === "object") {
@@ -75,7 +83,7 @@ const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
         }
         setErrors(fieldErrs);
       } else {
-        setErrors({ non_field: "Failed to record scrap. Please try again." });
+        setErrors({ non_field: "Failed to add scrap. Please try again." });
       }
     } finally {
       setSubmitting(false);
@@ -86,7 +94,7 @@ const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Record Scrap</h3>
+          <h3>Add Scrap Stock</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
@@ -97,25 +105,21 @@ const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
             </div>
           )}
 
+          {/* Description */}
           <div className="form-group">
-            <label>Source Material *</label>
-            <select
-              id="scrap-material-select"
-              value={form.material}
-              onChange={(e) => setForm({ ...form, material: e.target.value })}
-            >
-              <option value="">— Select material —</option>
-              {materials.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.material_name} ({m.material_type}) — {m.quantity} in stock
-                </option>
-              ))}
-            </select>
-            {errors.material && <span className="form-error">{errors.material}</span>}
+            <label>Description <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(optional)</span></label>
+            <input
+              id="scrap-description-input"
+              type="text"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="e.g. Cowhide offcuts, Rubber scraps…"
+            />
           </div>
 
+          {/* Weight */}
           <div className="form-group">
-            <label>Weight (kg) *</label>
+            <label>Weight (kg) <span style={{ color: "#DC2626" }}>*</span></label>
             <input
               id="scrap-weight-input"
               type="number"
@@ -128,10 +132,66 @@ const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
             {errors.weight_kg && <span className="form-error">{errors.weight_kg}</span>}
           </div>
 
+          {/* Price per kg */}
+          <div className="form-group">
+            <label>Price per kg (₱) <span style={{ color: "#DC2626" }}>*</span></label>
+            {/* Quick-select price buttons */}
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+              {QUICK_PRICES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  id={`quick-price-${p}`}
+                  onClick={() => setForm({ ...form, price_per_kg: String(p) })}
+                  style={{
+                    padding: "4px 16px",
+                    borderRadius: "999px",
+                    border: `1.5px solid ${form.price_per_kg === String(p) ? "var(--primary)" : "var(--border-color)"}`,
+                    background: form.price_per_kg === String(p) ? "rgba(123,31,31,0.08)" : "#F9FAFB",
+                    color: form.price_per_kg === String(p) ? "var(--primary)" : "var(--text-muted)",
+                    fontWeight: 700,
+                    fontSize: "0.82rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  ₱{p}/kg
+                </button>
+              ))}
+            </div>
+            <input
+              id="scrap-price-input"
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={form.price_per_kg}
+              onChange={(e) => setForm({ ...form, price_per_kg: e.target.value })}
+              placeholder="0.00"
+            />
+            {errors.price_per_kg && <span className="form-error">{errors.price_per_kg}</span>}
+          </div>
+
+          {/* Live preview */}
+          {(weight > 0 && price > 0) && (
+            <div style={{
+              background: "#F0FDF4",
+              border: "1px solid #BBF7D0",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+              marginBottom: "1rem",
+              fontSize: "0.85rem",
+            }}>
+              <div style={{ color: "var(--text-muted)", marginBottom: "2px" }}>Estimated Revenue</div>
+              <div style={{ fontWeight: 700, color: "#065F46", fontSize: "1.1rem" }}>
+                ₱{fmt(estRevenue)} <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "var(--text-muted)" }}>({weight.toFixed(3)} kg × ₱{fmt(price)}/kg)</span>
+              </div>
+            </div>
+          )}
+
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting} id="record-scrap-submit">
-              {submitting ? "Recording…" : "Record Scrap"}
+            <button type="submit" className="btn btn-primary" disabled={submitting} id="add-scrap-submit">
+              {submitting ? "Adding…" : "Add Scrap"}
             </button>
           </div>
         </form>
@@ -143,16 +203,17 @@ const RecordScrapModal = ({ materials, onClose, onSuccess }) => {
 /* ── Sell Scrap Modal ────────────────────────── */
 
 const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
-  const [form, setForm] = useState({ quantity_sold: "", sale_price_per_kg: "" });
+  const [form, setForm] = useState({
+    quantity_sold: "",
+    sale_price_per_kg: scrap.price_per_kg ? String(scrap.price_per_kg) : "",
+  });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   const maxWeight = Number(scrap.weight_kg);
   const weight = parseFloat(form.quantity_sold) || 0;
-  const price = parseFloat(form.sale_price_per_kg) || 0;
+  const price  = parseFloat(form.sale_price_per_kg) || 0;
   const estimatedTotal = weight * price;
-  const unitCost = parseFloat(scrap.material_unit_cost || 0);
-  const estimatedProfit = estimatedTotal - unitCost * weight;
 
   const validate = () => {
     const errs = {};
@@ -173,8 +234,8 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
     try {
       await api.post("/inventory/scrap-sales/", {
         scrap: scrap.id,
-        quantity_sold: Number(form.quantity_sold),
-        sale_price_per_kg: Number(form.sale_price_per_kg),
+        quantity_sold: weight,
+        sale_price_per_kg: price,
       });
       onSuccess("Scrap sold successfully.");
     } catch (err) {
@@ -201,7 +262,7 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
-        {/* Source info */}
+        {/* Batch info */}
         <div style={{
           background: "#F9FAFB",
           borderRadius: "8px",
@@ -211,9 +272,13 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
           color: "var(--text-muted)",
           lineHeight: 1.6,
         }}>
-          <strong style={{ color: "var(--text-dark)" }}>{scrap.material_name}</strong>
+          <strong style={{ color: "var(--text-dark)" }}>
+            {scrap.description || "Scrap Batch"}
+          </strong>
           <br />
-          Available: <strong>{Number(scrap.weight_kg).toFixed(3)} kg</strong>
+          Available: <strong>{maxWeight.toFixed(3)} kg</strong>
+          &nbsp;·&nbsp;
+          Sticker price: <strong>₱{fmt(scrap.price_per_kg)}/kg</strong>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-form">
@@ -241,6 +306,28 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
 
             <div className="form-group">
               <label>Price per kg (₱) *</label>
+              {/* Quick-select buttons in sell modal too */}
+              <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.4rem" }}>
+                {QUICK_PRICES.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setForm({ ...form, sale_price_per_kg: String(p) })}
+                    style={{
+                      padding: "3px 12px",
+                      borderRadius: "999px",
+                      border: `1.5px solid ${form.sale_price_per_kg === String(p) ? "var(--primary)" : "var(--border-color)"}`,
+                      background: form.sale_price_per_kg === String(p) ? "rgba(123,31,31,0.08)" : "#F9FAFB",
+                      color: form.sale_price_per_kg === String(p) ? "var(--primary)" : "var(--text-muted)",
+                      fontWeight: 700,
+                      fontSize: "0.78rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ₱{p}
+                  </button>
+                ))}
+              </div>
               <input
                 id="sell-price-input"
                 type="number"
@@ -256,12 +343,9 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Live preview */}
+          {/* Live total preview */}
           {(weight > 0 || price > 0) && (
             <div style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "0.75rem",
               background: "#F0FDF4",
               border: "1px solid #BBF7D0",
               borderRadius: "8px",
@@ -269,21 +353,9 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
               marginBottom: "1rem",
               fontSize: "0.82rem",
             }}>
-              <div>
-                <div style={{ color: "var(--text-muted)", marginBottom: "2px" }}>Est. Total</div>
-                <div style={{ fontWeight: 700, color: "#065F46", fontSize: "1rem" }}>
-                  ₱{fmt(estimatedTotal)}
-                </div>
-              </div>
-              <div>
-                <div style={{ color: "var(--text-muted)", marginBottom: "2px" }}>Est. Profit</div>
-                <div style={{
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  color: estimatedProfit >= 0 ? "#065F46" : "#991B1B",
-                }}>
-                  {estimatedProfit >= 0 ? "+" : ""}₱{fmt(estimatedProfit)}
-                </div>
+              <div style={{ color: "var(--text-muted)", marginBottom: "2px" }}>Sale Total</div>
+              <div style={{ fontWeight: 700, color: "#065F46", fontSize: "1rem" }}>
+                ₱{fmt(estimatedTotal)}
               </div>
             </div>
           )}
@@ -307,11 +379,10 @@ const SellScrapModal = ({ scrap, onClose, onSuccess }) => {
 export const ScrapView = () => {
   const [scraps, setScraps] = useState([]);
   const [sales, setSales] = useState([]);
-  const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
-  const [showRecordModal, setShowRecordModal] = useState(false);
-  const [sellTarget, setSellTarget] = useState(null); // scrap object to sell
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [sellTarget, setSellTarget] = useState(null);
   const [notification, setNotification] = useState(null);
 
   /* ── Fetch ───────────────────────────────────── */
@@ -319,14 +390,12 @@ export const ScrapView = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [rScraps, rSales, rMaterials] = await Promise.all([
+      const [rScraps, rSales] = await Promise.all([
         api.get("/inventory/scrap/"),
         api.get("/inventory/scrap-sales/"),
-        api.get("/inventory/materials/"),
       ]);
       setScraps(rScraps.data.results || rScraps.data);
       setSales(rSales.data.results || rSales.data);
-      setMaterials(rMaterials.data.results || rMaterials.data);
     } catch (err) {
       console.error("Failed to load scrap data:", err);
     } finally {
@@ -345,8 +414,8 @@ export const ScrapView = () => {
 
   /* ── Modal success handlers ──────────────────── */
 
-  const handleRecordSuccess = (msg) => {
-    setShowRecordModal(false);
+  const handleAddSuccess = (msg) => {
+    setShowAddModal(false);
     showNotif(msg);
     fetchAll();
   };
@@ -364,12 +433,6 @@ export const ScrapView = () => {
   const totalSoldKg = sales.reduce((sum, s) => sum + Number(s.quantity_sold), 0);
   const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total_amount), 0);
 
-  /* ── Enrich available scraps with unit_cost for sell modal preview ── */
-  const enrichedScraps = scraps.map((s) => {
-    const mat = materials.find((m) => m.id === s.material);
-    return { ...s, material_unit_cost: mat?.unit_cost || 0 };
-  });
-
   return (
     <div className="view-container">
       {/* Notification */}
@@ -383,12 +446,12 @@ export const ScrapView = () => {
         <button
           id="record-scrap-btn"
           className="btn btn-primary"
-          onClick={() => setShowRecordModal(true)}
+          onClick={() => setShowAddModal(true)}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Record Scrap
+          Add Scrap
         </button>
       </div>
 
@@ -397,7 +460,7 @@ export const ScrapView = () => {
         <div className="scrap-summary-card">
           <span className="scrap-summary-label">Available Weight</span>
           <span className="scrap-summary-value">{totalAvailableKg.toFixed(3)} kg</span>
-          <span className="scrap-summary-sub">{availableScraps.length} record{availableScraps.length !== 1 ? "s" : ""}</span>
+          <span className="scrap-summary-sub">{availableScraps.length} batch{availableScraps.length !== 1 ? "es" : ""}</span>
         </div>
         <div className="scrap-summary-card">
           <span className="scrap-summary-label">Total Sold</span>
@@ -415,7 +478,7 @@ export const ScrapView = () => {
       <div style={{ display: "flex", gap: "0.25rem", marginBottom: "1.25rem", borderBottom: "2px solid var(--border-color)" }}>
         {[
           { id: "inventory", label: "Scrap Inventory" },
-          { id: "sales", label: "Sales History" },
+          { id: "sales",     label: "Sales History" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -445,28 +508,28 @@ export const ScrapView = () => {
       ) : activeTab === "inventory" ? (
         /* ── Scrap Inventory Tab ── */
         scraps.length === 0 ? (
-          <div className="view-empty">No scrap records yet. Click "Record Scrap" to add one.</div>
+          <div className="view-empty">No scrap batches yet. Click "Add Scrap" to log one.</div>
         ) : (
           <div className="table-wrapper">
             <table className="data-table" id="scrap-inventory-table">
               <thead>
                 <tr>
-                  <th>Source Material</th>
-                  <th>Type</th>
+                  <th>Description</th>
                   <th>Weight (kg)</th>
-                  <th>Date Recorded</th>
+                  <th>Price / kg</th>
+                  <th>Date Added</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {enrichedScraps.map((s) => (
+                {scraps.map((s) => (
                   <tr key={s.id}>
-                    <td style={{ fontWeight: 600 }}>{s.material_name}</td>
-                    <td style={{ color: "var(--text-muted)", fontSize: "0.82rem", textTransform: "capitalize" }}>
-                      {s.material_type || "—"}
+                    <td style={{ fontWeight: 600 }}>
+                      {s.description || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}
                     </td>
                     <td>{Number(s.weight_kg).toFixed(3)}</td>
+                    <td style={{ fontWeight: 600 }}>₱{fmt(s.price_per_kg)}</td>
                     <td>{fmtDate(s.recorded_date)}</td>
                     <td><StatusBadge status={s.status} /></td>
                     <td>
@@ -498,11 +561,10 @@ export const ScrapView = () => {
             <table className="data-table" id="scrap-sales-table">
               <thead>
                 <tr>
-                  <th>Source Material</th>
+                  <th>Batch</th>
                   <th>Weight Sold (kg)</th>
                   <th>Price / kg</th>
                   <th>Total Amount</th>
-                  <th>Profit</th>
                   <th>Sold By</th>
                   <th>Date</th>
                 </tr>
@@ -510,16 +572,12 @@ export const ScrapView = () => {
               <tbody>
                 {sales.map((s) => (
                   <tr key={s.id}>
-                    <td style={{ fontWeight: 600 }}>{s.scrap_material}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {s.scrap_label || <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>—</span>}
+                    </td>
                     <td>{Number(s.quantity_sold).toFixed(3)}</td>
                     <td>₱{fmt(s.sale_price_per_kg)}</td>
                     <td style={{ fontWeight: 600 }}>₱{fmt(s.total_amount)}</td>
-                    <td style={{
-                      fontWeight: 700,
-                      color: Number(s.profit) >= 0 ? "#059669" : "#DC2626",
-                    }}>
-                      {Number(s.profit) >= 0 ? "+" : ""}₱{fmt(s.profit)}
-                    </td>
                     <td style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
                       {s.sold_by_name || "—"}
                     </td>
@@ -533,11 +591,10 @@ export const ScrapView = () => {
       )}
 
       {/* Modals */}
-      {showRecordModal && (
-        <RecordScrapModal
-          materials={materials}
-          onClose={() => setShowRecordModal(false)}
-          onSuccess={handleRecordSuccess}
+      {showAddModal && (
+        <AddScrapModal
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleAddSuccess}
         />
       )}
       {sellTarget && (
