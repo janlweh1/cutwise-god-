@@ -122,44 +122,43 @@ class Material(models.Model):
         return self.quantity * self.unit_cost
 
 
-
 # ──────────────────────────────────────────────
-# Scrap
+# Scrap Type
 # ──────────────────────────────────────────────
 
-class Scrap(models.Model):
+class ScrapType(models.Model):
     """
-    Scrap leather produced from cutting operations.
-    Links to the Material it was cut from and tracks its availability for sale.
+    Defines a category of production scrap (e.g. Low-grade or High-grade).
+    Tracks the total available kilograms currently on hand from production.
+    Not linked to inventory materials — scraps come directly from the
+    cutting/production process.
     """
-
-    class ScrapStatus(models.TextChoices):
-        AVAILABLE = "available", "Available"
-        SOLD = "sold", "Sold"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    material = models.ForeignKey(
-        Material,
-        on_delete=models.CASCADE,
-        related_name="scraps",
-        help_text="The source material this scrap was cut from.",
+    name = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Display name for this scrap type (e.g. 'Low-grade Scrap').",
     )
-    weight_kg = models.DecimalField(
-        max_digits=10, decimal_places=3, default=0,
-        help_text="Weight of the scrap in kilograms.",
+    price_per_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Selling price per kilogram in Philippine Pesos.",
     )
-    recorded_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(
-        max_length=10,
-        choices=ScrapStatus.choices,
-        default=ScrapStatus.AVAILABLE,
+    available_kg = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=0,
+        help_text="Current available stock in kilograms (updated on stock additions and sales).",
     )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-recorded_date"]
+        ordering = ["price_per_kg"]
 
     def __str__(self):
-        return f"Scrap from {self.material.material_name} — {self.weight_kg} kg ({self.status})"
+        return f"{self.name} (₱{self.price_per_kg}/kg)"
 
 
 # ──────────────────────────────────────────────
@@ -167,13 +166,18 @@ class Scrap(models.Model):
 # ──────────────────────────────────────────────
 
 class ScrapSale(models.Model):
-    """Records a sale transaction for scrap material."""
+    """
+    Records a sale transaction for production scrap.
+    Directly references the ScrapType, which tracks available_kg.
+    Revenue = quantity_sold × price_per_kg (no material cost deducted).
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    scrap = models.ForeignKey(
-        Scrap,
-        on_delete=models.CASCADE,
+    scrap_type = models.ForeignKey(
+        ScrapType,
+        on_delete=models.PROTECT,
         related_name="sales",
+        help_text="The type of scrap that was sold.",
     )
     sold_by = models.ForeignKey(
         User,
@@ -187,17 +191,18 @@ class ScrapSale(models.Model):
         max_digits=10, decimal_places=3, default=0,
         help_text="Weight sold in kilograms.",
     )
-    sale_price_per_kg = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sale_price_per_kg = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Price per kg at the time of sale (snapshot of ScrapType.price_per_kg).",
+    )
     total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     sale_date = models.DateTimeField(auto_now_add=True)
-    profit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["-sale_date"]
 
     def __str__(self):
-        return f"Sale of {self.scrap} — ₱{self.total_amount}"
-
+        return f"Sale of {self.scrap_type.name} — {self.quantity_sold} kg @ ₱{self.sale_price_per_kg}/kg — ₱{self.total_amount}"
 
 
 # ──────────────────────────────────────────────
@@ -211,7 +216,7 @@ class AuditLog(models.Model):
         MATERIAL_ADDED = "material_added", "Material Added"
         MATERIAL_UPDATED = "material_updated", "Material Updated"
         MATERIAL_DELETED = "material_deleted", "Material Deleted"
-        SCRAP_RECORDED = "scrap_recorded", "Scrap Recorded"
+        SCRAP_STOCK_ADDED = "scrap_stock_added", "Scrap Stock Added"
         SCRAP_SOLD = "scrap_sold", "Scrap Sold"
         STOCK_ADJUSTED = "stock_adjusted", "Stock Adjusted"
         SUPPLIER_ADDED = "supplier_added", "Supplier Added"

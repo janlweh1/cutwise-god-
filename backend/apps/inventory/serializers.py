@@ -1,6 +1,6 @@
 import re
 from rest_framework import serializers
-from .models import Supplier, Material, Scrap, ScrapSale, AuditLog
+from .models import Supplier, Material, ScrapType, ScrapSale, AuditLog
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -77,27 +77,33 @@ class MaterialSerializer(serializers.ModelSerializer):
             return obj.added_by.email
 
 
-class ScrapSerializer(serializers.ModelSerializer):
-    material_name = serializers.CharField(source="material.material_name", read_only=True)
-    material_type = serializers.CharField(source="material.material_type", read_only=True)
+# ──────────────────────────────────────────────
+# Scrap Type
+# ──────────────────────────────────────────────
+
+class ScrapTypeSerializer(serializers.ModelSerializer):
+    """Serializer for production scrap categories."""
 
     class Meta:
-        model = Scrap
+        model = ScrapType
         fields = [
             "id",
-            "material",
-            "material_name",
-            "material_type",
-            "weight_kg",
-            "recorded_date",
-            "status",
+            "name",
+            "price_per_kg",
+            "available_kg",
+            "created_at",
         ]
-        read_only_fields = ["id", "recorded_date"]
+        read_only_fields = ["id", "created_at"]
 
+
+# ──────────────────────────────────────────────
+# Scrap Sale
+# ──────────────────────────────────────────────
 
 class ScrapSaleSerializer(serializers.ModelSerializer):
-    scrap_material = serializers.CharField(
-        source="scrap.material.material_name", read_only=True
+    scrap_type_name = serializers.CharField(source="scrap_type.name", read_only=True)
+    price_per_kg_snapshot = serializers.DecimalField(
+        source="scrap_type.price_per_kg", max_digits=10, decimal_places=2, read_only=True
     )
     sold_by_name = serializers.SerializerMethodField()
 
@@ -105,17 +111,17 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
         model = ScrapSale
         fields = [
             "id",
-            "scrap",
-            "scrap_material",
+            "scrap_type",
+            "scrap_type_name",
+            "price_per_kg_snapshot",
             "sold_by",
             "sold_by_name",
             "quantity_sold",
             "sale_price_per_kg",
             "total_amount",
             "sale_date",
-            "profit",
         ]
-        read_only_fields = ["id", "sale_date", "sold_by", "total_amount", "profit"]
+        read_only_fields = ["id", "sale_date", "sold_by", "total_amount", "sale_price_per_kg"]
 
     def get_sold_by_name(self, obj):
         if not obj.sold_by:
@@ -126,23 +132,21 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
             return obj.sold_by.email
 
     def validate(self, attrs):
-        scrap = attrs.get("scrap")
+        scrap_type = attrs.get("scrap_type")
         quantity_sold = attrs.get("quantity_sold")
 
-        if scrap.status == Scrap.ScrapStatus.SOLD:
-            raise serializers.ValidationError(
-                {"scrap": "This scrap record has already been fully sold."}
-            )
-
-        if quantity_sold <= 0:
+        if quantity_sold is None or quantity_sold <= 0:
             raise serializers.ValidationError(
                 {"quantity_sold": "Weight to sell must be greater than zero."}
             )
 
-        if quantity_sold > scrap.weight_kg:
+        if quantity_sold > scrap_type.available_kg:
             raise serializers.ValidationError(
                 {
-                    "quantity_sold": f"Cannot sell more than the available weight of {scrap.weight_kg:.3f} kg."
+                    "quantity_sold": (
+                        f"Cannot sell more than the available stock of "
+                        f"{scrap_type.available_kg:.3f} kg for '{scrap_type.name}'."
+                    )
                 }
             )
 
@@ -151,40 +155,39 @@ class ScrapSaleSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from django.db import transaction
 
-        scrap = validated_data["scrap"]
-        weight = validated_data["quantity_sold"]
-        price_per_kg = validated_data["sale_price_per_kg"]
-        total_amount = weight * price_per_kg
-        # Profit = revenue - cost of the leather that became scrap
-        unit_cost = scrap.material.unit_cost or 0
-        profit = total_amount - (unit_cost * weight)
+        scrap_type = validated_data["scrap_type"]
+        quantity = validated_data["quantity_sold"]
 
         with transaction.atomic():
-            # Lock the scrap record to prevent race conditions during concurrent requests
-            scrap = Scrap.objects.select_for_update().get(pk=scrap.pk)
+            # Lock the scrap type row to prevent race conditions
+            scrap_type = ScrapType.objects.select_for_update().get(pk=scrap_type.pk)
 
-            # Re-verify weight under lock
-            if weight > scrap.weight_kg:
+            # Re-verify under lock
+            if quantity > scrap_type.available_kg:
                 raise serializers.ValidationError(
                     {
-                        "quantity_sold": f"Cannot sell more than the available weight of {scrap.weight_kg:.3f} kg."
+                        "quantity_sold": (
+                            f"Cannot sell more than the available stock of "
+                            f"{scrap_type.available_kg:.3f} kg for '{scrap_type.name}'."
+                        )
                     }
                 )
 
-            # Deduct the weight and adjust status if sold out
-            scrap.weight_kg -= weight
-            if scrap.weight_kg <= 0:
-                scrap.weight_kg = 0
-                scrap.status = Scrap.ScrapStatus.SOLD
-            scrap.save(update_fields=["weight_kg", "status"])
+            price_per_kg = scrap_type.price_per_kg
+            total_amount = quantity * price_per_kg
+
+            # Deduct from available stock
+            scrap_type.available_kg -= quantity
+            scrap_type.save(update_fields=["available_kg"])
 
             return ScrapSale.objects.create(
-                **validated_data,
+                scrap_type=scrap_type,
+                quantity_sold=quantity,
+                sale_price_per_kg=price_per_kg,
                 total_amount=total_amount,
-                profit=profit,
+                **{k: v for k, v in validated_data.items()
+                   if k not in ("scrap_type", "quantity_sold")},
             )
-
-
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

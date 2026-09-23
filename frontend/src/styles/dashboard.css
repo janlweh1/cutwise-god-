@@ -868,9 +868,13 @@
    Scrap Summary Cards
    ═══════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════
+   Scrap Management View Styles
+   ═══════════════════════════════════════════════ */
+
 .scrap-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -884,6 +888,11 @@
   flex-direction: column;
   gap: 0.35rem;
   box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease;
+}
+
+.scrap-summary-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .scrap-summary-label {
@@ -896,7 +905,7 @@
 
 .scrap-summary-value {
   font-family: var(--font-heading);
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
   color: var(--text-dark);
 }
@@ -904,6 +913,257 @@
 .scrap-summary-sub {
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.scrap-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+.scrap-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-top: 4px solid var(--primary);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.scrap-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -4px rgba(123, 31, 31, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-color: rgba(123, 31, 31, 0.35);
+}
+
+.scrap-card-header {
+  padding: 1.25rem 1.25rem 1rem;
+  background: linear-gradient(180deg, var(--bg-cream) 0%, rgba(248, 245, 240, 0.35) 100%);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scrap-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.scrap-grade-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.scrap-grade-badge.premium {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.scrap-grade-badge.standard {
+  background: #F3F4F6;
+  color: #374151;
+  border: 1px solid #E5E7EB;
+}
+
+.scrap-status-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.scrap-status-pill.in-stock {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.scrap-status-pill.low-stock {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.scrap-status-pill.out-of-stock {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+.scrap-card-title {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 0.2rem;
+}
+
+.scrap-card-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 0.85rem;
+}
+
+.scrap-price-banner {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scrap-price-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scrap-price-amount {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.scrap-price-unit {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 0.2rem;
+}
+
+.scrap-card-body {
+  padding: 1.15rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.scrap-stock-box {
+  background: #FAFAFA;
+  border: 1px solid #F0F0F0;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.scrap-stock-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.scrap-stock-box-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scrap-stock-box-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.scrap-stock-number {
+  font-family: var(--font-heading);
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.scrap-progress-track {
+  height: 6px;
+  background: #E5E7EB;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.scrap-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.scrap-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 1.15rem;
+}
+
+.scrap-btn-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text-dark);
+  border: 1.5px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scrap-btn-add:hover {
+  background: var(--bg-cream);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.scrap-btn-sell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #ffffff;
+  border: 1.5px solid var(--primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scrap-btn-sell:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.scrap-btn-sell:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #9CA3AF;
+  border-color: #9CA3AF;
 }
 
 .scrap-value-preview {
@@ -1010,69 +1270,885 @@
 }
 
 /* ═══════════════════════════════════════════════
-   Clerk Dashboard Home Custom Layout
+   Clerk Dashboard Home Modern Design
    ═══════════════════════════════════════════════ */
-.clerk-home-grid {
+
+/* Hero Banner */
+.clerk-hero-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #FAF5F5 50%, #F5EBEB 100%);
+  border: 1px solid rgba(123, 31, 31, 0.15);
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 4px 20px -2px rgba(123, 31, 31, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.clerk-hero-banner::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(123, 31, 31, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.clerk-hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.clerk-hero-title {
+  font-family: var(--font-heading);
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.clerk-hero-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.clerk-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem;
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.clerk-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+.clerk-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.clerk-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.15rem;
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(123, 31, 31, 0.25);
+  transition: all 0.2s ease;
+}
+
+.clerk-btn-primary:hover {
+  background: #631717;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(123, 31, 31, 0.35);
+}
+
+.clerk-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.15rem;
+  background: #ffffff;
+  color: var(--text-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clerk-btn-secondary:hover {
+  background: var(--bg-cream);
+  border-color: #D1D5DB;
+  transform: translateY(-1px);
+}
+
+.clerk-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clerk-btn-icon:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: #FFF5F5;
+}
+
+/* Stat Cards Enhancement */
+.stat-card.alert-state {
+  border-color: #FCD34D;
+  background: linear-gradient(180deg, #FFFDF8 0%, #FFFFFF 100%);
+}
+
+.stat-card.healthy-state {
+  border-color: #A7F3D0;
+  background: linear-gradient(180deg, #F9FDFB 0%, #FFFFFF 100%);
+}
+
+.stat-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.stat-badge-chip.success {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.stat-badge-chip.warning {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+/* Quick Actions Cards */
+.clerk-quick-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+  position: relative;
+  z-index: 20;
+}
+
+.clerk-quick-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: visible;
+  cursor: pointer;
+}
+
+.clerk-quick-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  border-color: rgba(123, 31, 31, 0.3);
+}
+
+.clerk-quick-card.lookup-card {
+  cursor: default;
+  overflow: visible;
+}
+
+.clerk-quick-card.lookup-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border-color);
+}
+
+.clerk-quick-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clerk-quick-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.clerk-quick-icon-wrap.inventory-theme {
+  background: #FEE2E2;
+  color: var(--primary);
+}
+
+.clerk-quick-icon-wrap.scrap-theme {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.clerk-quick-icon-wrap.lookup-theme {
+  background: #E0E7FF;
+  color: #4F46E5;
+}
+
+.clerk-quick-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.clerk-quick-card h4 {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.clerk-quick-card p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.clerk-quick-link {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.clerk-quick-card:hover .clerk-quick-link {
+  text-decoration: underline;
+}
+
+/* Two Column Operations Hub */
+.clerk-ops-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
   gap: 1.25rem;
   margin-bottom: 2rem;
 }
 
-@media (max-width: 1024px) {
-  .clerk-home-grid {
+@media (max-width: 1080px) {
+  .clerk-ops-grid {
     grid-template-columns: 1fr;
   }
 }
 
-.dashboard-card {
-  background: #fff;
+.clerk-ops-panel {
+  background: #ffffff;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 1.5rem;
+  border-radius: 12px;
+  padding: 1.35rem;
   box-shadow: var(--shadow-sm);
-  height: 100%;
-}
-
-.dashboard-card-title {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin-bottom: 1.25rem;
-}
-
-.task-list {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
 }
 
-.task-item {
+.clerk-ops-panel-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  cursor: pointer;
-  user-select: none;
+  justify-content: space-between;
+  margin-bottom: 1.15rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.task-checkbox {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: 1.5px solid var(--border-color);
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
-.task-text {
-  font-size: 0.875rem;
+.clerk-ops-panel-title {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+/* Recent Updates Desk */
+.clerk-update-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.clerk-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: #FAFAFA;
+  border: 1px solid #F0F0F0;
+  transition: all 0.15s ease;
+  gap: 0.75rem;
+}
+
+.clerk-update-row:hover {
+  background: #FFF9F9;
+  border-color: #F0D0D0;
+}
+
+.clerk-update-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.clerk-update-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clerk-update-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.clerk-sku-tag {
+  background: #E5E7EB;
+  color: #374151;
+  font-family: monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.clerk-update-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.clerk-update-qty {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+}
+
+.clerk-update-time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Stock Health Card & Watchlist */
+.health-meter-container {
+  margin-bottom: 1.25rem;
+  background: #F9FAFB;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+}
+
+.health-meter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.health-bar-track {
+  height: 8px;
+  background: #E5E7EB;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.health-bar-fill-healthy {
+  background: #10B981;
+  transition: width 0.5s ease;
+}
+
+.health-bar-fill-low {
+  background: #F59E0B;
+  transition: width 0.5s ease;
+}
+
+.health-bar-fill-out {
+  background: #EF4444;
+  transition: width 0.5s ease;
+}
+
+.health-legend-row {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.health-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.health-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Clean Healthy State celebration */
+.clerk-healthy-state {
+  text-align: center;
+  padding: 2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.clerk-healthy-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #D1FAE5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.clerk-healthy-title {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.clerk-healthy-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 260px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Low Stock Alert Item in Watchlist */
+.watchlist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.watchlist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.watchlist-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #92400E;
+}
+
+.watchlist-detail {
+  font-size: 0.72rem;
+  color: #B45309;
+}
+
+.watchlist-action-btn {
+  padding: 0.35rem 0.65rem;
+  background: #F59E0B;
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s ease;
+}
+
+.watchlist-action-btn:hover {
+  background: #D97706;
+}
+
+/* Quick Stock Lookup Modal / Drawer */
+.clerk-lookup-input {
+  width: 100%;
+  padding: 0.65rem 1rem 0.65rem 2.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: #FAFAFA;
   transition: all 0.2s ease;
 }
 
-.task-text.completed {
-  text-decoration: line-through;
-  color: var(--text-muted);
+.clerk-lookup-input:focus {
+  background: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(123, 31, 31, 0.1);
+  outline: none;
 }
+
+.clerk-lookup-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: #ffffff;
+  border: 1px solid #D1D5DB;
+  border-radius: 10px;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.18), 0 4px 14px -2px rgba(0, 0, 0, 0.08);
+  padding: 0.5rem;
+}
+
+.clerk-lookup-results::-webkit-scrollbar {
+  width: 5px;
+}
+
+.clerk-lookup-results::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+.clerk-lookup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: 7px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clerk-lookup-item:hover {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+}
+
+/* ═══════════════════════════════════════════════
+   Supervisor & Admin Dashboard Home Modern Design
+   ═══════════════════════════════════════════════ */
+
+/* Supervisor Hero Banner */
+.supervisor-hero-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #FFF9F5 50%, #FBF0E6 100%);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 4px 20px -2px rgba(217, 119, 6, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.supervisor-hero-banner::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(217, 119, 6, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Admin Hero Banner */
+.admin-hero-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #FAF5F5 45%, #F5EAEB 100%);
+  border: 1px solid rgba(123, 31, 31, 0.2);
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 4px 20px -2px rgba(123, 31, 31, 0.1), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-hero-banner::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(123, 31, 31, 0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Role Pills */
+.role-pill-supervisor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem;
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.role-pill-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem;
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Quick Launcher Badge & Themes */
+.clerk-quick-icon-wrap.admin-theme {
+  background: #FEE2E2;
+  color: var(--primary);
+}
+
+.clerk-quick-icon-wrap.supervisor-theme {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.clerk-quick-icon-wrap.audit-theme {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.clerk-quick-icon-wrap.supplier-theme {
+  background: #F0FDF4;
+  color: #16A34A;
+}
+
+/* Admin User Governance Widget */
+.admin-user-roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.admin-role-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1.15rem;
+}
+
+.admin-role-mini-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+}
+
+.admin-role-mini-card .count {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  font-family: var(--font-heading);
+}
+
+.admin-role-mini-card .label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-user-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-user-mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  background: #FAFAFA;
+  border: 1px solid #F0F0F0;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.admin-user-mini-row:hover {
+  background: #FFF9F9;
+  border-color: #F0D0D0;
+}
+
+.admin-user-mini-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #E5E7EB;
+  color: #4B5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Supplier Quick Directory Widget */
+.supplier-quick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.supplier-quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  background: #FAFAFA;
+  border: 1px solid #F0F0F0;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.supplier-quick-row:hover {
+  background: #F4FDF7;
+  border-color: #BBF7D0;
+}
+
+.supplier-quick-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.supplier-quick-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-dark);
+}
+
+.supplier-quick-contact {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Priority Reorder Table */
+.reorder-urgency-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.reorder-urgency-badge.out {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.reorder-urgency-badge.critical {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+

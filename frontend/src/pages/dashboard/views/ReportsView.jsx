@@ -13,7 +13,7 @@ const ACTION_COLORS = {
   material_added: "#059669",
   material_updated: "#2563EB",
   material_deleted: "#DC2626",
-  scrap_recorded: "#D97706",
+  scrap_stock_added: "#D97706",
   scrap_sold: "#7C3AED",
   stock_adjusted: "#0891B2",
   supplier_added: "#059669",
@@ -44,7 +44,7 @@ const generateExcel = ({ materials, suppliers, scraps, dateFrom, dateTo, timeFro
   const wb = XLSX.utils.book_new();
 
   const fromLabel = dateFrom ? `${dateFrom}${timeFrom ? " " + timeFrom : ""}` : "All";
-  const toLabel   = dateTo   ? `${dateTo}${timeTo   ? " " + timeTo   : ""}` : "All";
+  const toLabel = dateTo ? `${dateTo}${timeTo ? " " + timeTo : ""}` : "All";
   const rangeLabel = (dateFrom || dateTo || timeFrom || timeTo)
     ? `${fromLabel} → ${toLabel}`
     : "All Dates";
@@ -170,7 +170,7 @@ const generatePDF = async ({ materials, suppliers, scraps, chartRef, dateFrom, d
     doc.setFontSize(8.5);
     doc.setTextColor(230, 210, 210);
     const fromLabel = dateFrom ? `${dateFrom}${timeFrom ? " " + timeFrom : ""}` : "All";
-    const toLabel   = dateTo   ? `${dateTo}${timeTo   ? " " + timeTo   : ""}` : "All";
+    const toLabel = dateTo ? `${dateTo}${timeTo ? " " + timeTo : ""}` : "All";
     const rangeLabel = `Data range: ${fromLabel} → ${toLabel}`;
     doc.text(rangeLabel, margin, 28);
   }
@@ -537,18 +537,18 @@ export const ReportsView = () => {
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
   const [reportDateFrom, setReportDateFrom] = useState("");
-  const [reportDateTo,   setReportDateTo]   = useState("");
+  const [reportDateTo, setReportDateTo] = useState("");
   const [reportTimeFrom, setReportTimeFrom] = useState("");
-  const [reportTimeTo,   setReportTimeTo]   = useState("");
+  const [reportTimeTo, setReportTimeTo] = useState("");
   const [generatingExcel, setGeneratingExcel] = useState(false);
 
   /* ── Fetch all report data + generate PDF ── */
   const buildReportParams = () => {
     const p = {};
     if (reportDateFrom) p.date_from = reportDateFrom;
-    if (reportDateTo)   p.date_to   = reportDateTo;
+    if (reportDateTo) p.date_to = reportDateTo;
     if (reportTimeFrom) p.time_from = reportTimeFrom;
-    if (reportTimeTo)   p.time_to   = reportTimeTo;
+    if (reportTimeTo) p.time_to = reportTimeTo;
     return p;
   };
 
@@ -567,7 +567,7 @@ export const ReportsView = () => {
       const [resMat, resSuppliers, resScraps] = await Promise.all([
         api.get("/inventory/materials/", { params }),
         api.get("/inventory/suppliers/"),
-        api.get("/inventory/scrap/", { params }),
+        api.get("/inventory/scrap-types/"),
       ]);
       const materials = resMat.data.results || resMat.data;
       const suppliers = resSuppliers.data.results || resSuppliers.data;
@@ -603,7 +603,7 @@ export const ReportsView = () => {
       const [resMat, resSuppliers, resScraps] = await Promise.all([
         api.get("/inventory/materials/", { params }),
         api.get("/inventory/suppliers/"),
-        api.get("/inventory/scrap/", { params }),
+        api.get("/inventory/scrap-types/"),
       ]);
       const materials = resMat.data.results || resMat.data;
       const suppliers = resSuppliers.data.results || resSuppliers.data;
@@ -861,7 +861,7 @@ export const ReportsView = () => {
           <option value="material_added">Material Added</option>
           <option value="material_updated">Material Updated</option>
           <option value="material_deleted">Material Deleted</option>
-          <option value="scrap_recorded">Scrap Recorded</option>
+          <option value="scrap_stock_added">Scrap Stock Added</option>
           <option value="scrap_sold">Scrap Sold</option>
           <option value="stock_adjusted">Stock Adjusted</option>
           <option value="supplier_added">Supplier Added</option>

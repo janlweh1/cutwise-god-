@@ -44,25 +44,43 @@ export const InventoryView = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editingMat, setEditingMat] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  /* ── Fetch data ──────────────────────────────── */
+  /* ── Pagination state ────────────────────────── */
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 30;
+
+  /* ── Material No. generator ──────────────────── */
+  const getMaterialNo = (index) => `MAT-${String((page - 1) * PAGE_SIZE + index + 1).padStart(3, "0")}`;
+
+  /* ── Fetch data ─────────────────────────── */
   const fetchMaterials = useCallback(async () => {
+    setLoading(true);
     try {
-      const params = {};
+      const params = { page };
       if (search) params.search = search;
       if (statusFilter) params.stock_status = statusFilter;
+      if (typeFilter) params.material_type = typeFilter;  // server-side filter — keeps count accurate
       const res = await api.get("/inventory/materials/", { params });
-      setMaterials(res.data.results || res.data);
+      const data = res.data;
+      if (data.results !== undefined) {
+        setMaterials(data.results);
+        setTotalCount(data.count || 0);
+      } else {
+        setMaterials(Array.isArray(data) ? data : []);
+        setTotalCount(Array.isArray(data) ? data.length : 0);
+      }
     } catch (err) {
       console.error("Failed to fetch materials:", err);
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, typeFilter, page]);
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -73,15 +91,15 @@ export const InventoryView = () => {
     }
   }, []);
 
+  /* Reset to page 1 whenever filters change */
+  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter]);
+
   useEffect(() => {
     fetchMaterials();
     fetchSuppliers();
   }, [fetchMaterials, fetchSuppliers]);
 
-  /* ── Filter by type locally ──────────────────── */
-  const displayed = typeFilter
-    ? materials.filter((m) => m.material_type === typeFilter)
-    : materials;
+  // No client-side type filter needed — the server handles it now
 
   /* ── Notification ────────────────────────────── */
   const showNotif = (message, type = "success") => {
@@ -116,6 +134,7 @@ export const InventoryView = () => {
       supplier: mat.supplier || "",
     });
     setEditingId(mat.id);
+    setEditingMat(mat);
     setErrors({});
     setShowModal(true);
   };
@@ -123,6 +142,7 @@ export const InventoryView = () => {
   const closeModal = () => {
     setShowModal(false);
     setEditingId(null);
+    setEditingMat(null);
     setForm(emptyForm);
     setErrors({});
   };
@@ -252,13 +272,14 @@ export const InventoryView = () => {
       {/* Table */}
       {loading ? (
         <div className="view-loading">Loading materials...</div>
-      ) : displayed.length === 0 ? (
+      ) : materials.length === 0 ? (
         <div className="view-empty">No materials found. Add your first material above.</div>
       ) : (
         <div className="table-wrapper">
           <table className="data-table">
             <thead>
               <tr>
+                <th>Material No.</th>
                 <th>Material Name</th>
                 <th>Type</th>
                 <th>Size</th>
@@ -270,8 +291,11 @@ export const InventoryView = () => {
               </tr>
             </thead>
             <tbody>
-              {displayed.map((mat) => (
+              {materials.map((mat, idx) => (
                 <tr key={mat.id} className={mat.stock_status === "low_stock" ? "row-warning" : mat.stock_status === "out_of_stock" ? "row-danger" : ""}>
+                  <td style={{ fontFamily: "monospace", fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                    {mat.material_no || getMaterialNo(idx)}
+                  </td>
                   <td className="td-bold">{mat.material_name}</td>
                   <td>{MATERIAL_TYPES.find((t) => t.value === mat.material_type)?.label || mat.material_type}</td>
                   <td>{mat.size || "—"}</td>
@@ -304,6 +328,42 @@ export const InventoryView = () => {
         </div>
       )}
 
+      {/* Pagination Controls */}
+      {totalCount > PAGE_SIZE && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: "1rem",
+          padding: "0.75rem 1rem",
+          background: "#fff",
+          border: "1px solid var(--border-color)",
+          borderRadius: "8px",
+          boxShadow: "var(--shadow-sm)",
+        }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{ padding: "0.4rem 1rem", fontSize: "0.85rem" }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-muted)" }}>
+            Page {page} of {Math.ceil(totalCount / PAGE_SIZE)}
+            <span style={{ marginLeft: "0.5rem", fontWeight: 400 }}>({totalCount} total)</span>
+          </span>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page * PAGE_SIZE >= totalCount}
+            style={{ padding: "0.4rem 1rem", fontSize: "0.85rem" }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
@@ -314,6 +374,26 @@ export const InventoryView = () => {
             </div>
             <form onSubmit={handleSubmit} className="modal-form">
               {errors.non_field_errors && <div className="form-error-box">{errors.non_field_errors}</div>}
+
+              {/* Material No. — read-only display */}
+              <div className="form-group" style={{ marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }}>Material No.</label>
+                <div style={{
+                  padding: "0.45rem 0.75rem",
+                  background: "#F3F4F6",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border-color)",
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                  color: "var(--text-muted)",
+                  letterSpacing: "0.05em",
+                }}>
+                  {editingId && editingMat
+                    ? (editingMat.material_no || getMaterialNo(materials.findIndex(m => m.id === editingId)))
+                    : "Will be assigned automatically"}
+                </div>
+              </div>
 
               <div className="form-group">
                 <label>Material Name *</label>
